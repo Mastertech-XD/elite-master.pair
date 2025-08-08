@@ -3,29 +3,25 @@ const express = require('express');
 const fs = require('fs');
 let router = express.Router();
 const pino = require("pino");
-const { default: makeWASocket, useMultiFileAuthState, delay, Browsers, makeCacheableSignalKeyStore, getAggregateVotesInPollMessage, DisconnectReason, WA_DEFAULT_EPHEMERAL, jidNormalizedUser, proto, getDevice, generateWAMessageFromContent, fetchLatestBaileysVersion, makeInMemoryStore, getContentType, generateForwardMessageContent, downloadContentFromMessage, jidDecode } = require('@whiskeysockets/baileys')
-
+const { default: makeWASocket, useMultiFileAuthState, delay, Browsers, makeCacheableSignalKeyStore } = require('@whiskeysockets/baileys');
 const { upload } = require('./mega');
+
 function removeFile(FilePath) {
     if (!fs.existsSync(FilePath)) return false;
     fs.rmSync(FilePath, { recursive: true, force: true });
 }
+
 router.get('/', async (req, res) => {
     const id = makeid();
     let num = req.query.number;
-    async function MASTERTECH_XD_PAIR_CODE() {
-        const {
-            state,
-            saveCreds
-        } = await useMultiFileAuthState('./temp/' + id);
+
+    async function MALVIN_XD_PAIR_CODE() {
+        const { state, saveCreds } = await useMultiFileAuthState('./temp/' + id);
+
         try {
-var items = ["Safari"];
-function selectRandomItem(array) {
-  var randomIndex = Math.floor(Math.random() * array.length);
-  return array[randomIndex];
-}
-var randomItem = selectRandomItem(items);
-            
+            const items = ["Safari"];
+            const randomItem = items[Math.floor(Math.random() * items.length)];
+
             let sock = makeWASocket({
                 auth: {
                     creds: state.creds,
@@ -37,70 +33,83 @@ var randomItem = selectRandomItem(items);
                 syncFullHistory: false,
                 browser: Browsers.macOS(randomItem)
             });
+
             if (!sock.authState.creds.registered) {
                 await delay(1500);
                 num = num.replace(/[^0-9]/g, '');
                 const code = await sock.requestPairingCode(num);
-                if (!res.headersSent) {
-                    await res.send({ code });
-                }
+                if (!res.headersSent) await res.send({ code });
             }
+
             sock.ev.on('creds.update', saveCreds);
             sock.ev.on("connection.update", async (s) => {
+                const { connection, lastDisconnect } = s;
 
-    const {
-                    connection,
-                    lastDisconnect
-                } = s;
-                
-                if (connection == "open") {
-					await delay(5000);
-					let data = fs.readFileSync(__dirname + `/temp/${id}/creds.json`);
-					await delay(800);
-				   let b64data = Buffer.from(data).toString('base64');
-				   let session = await Qr_Code_By_Wasi_Tech.sendMessage(Qr_Code_By_Wasi_Tech.user.id, { text: '' + b64data });
-	
-				   let WASI_MD_TEXT = `
-*_Session Connected By MASTERTECH_*
-*_Made With 🤍_*
-______________________________________
-╔════◇
-║ *『AMAZING YOU'VE CHOSEN MASTERTECH-XD』*
-║ _You Have Completed the First Step to Deploy a Whatsapp Bot._
-╚════════════════════════╝
-╔═════◇
-║  『••• 𝗩𝗶𝘀𝗶𝘁 𝗙𝗼𝗿 𝗛𝗲𝗹𝗽 •••』
-║❒ *Ytube:* _youtube.com/@mastertech
-║❒ *Owner:* _https://wa.me/254743727510_
-║❒ *Repo:* _https://github.com/Mastertech-XD/Mastertech_
-║❒ *WaGroup:* _https://whatsapp.com/channel/0029VazeyYx35fLxhB5TfC3D_
-║❒ *Plugins:* _https://github.com/Mastertech-XD/Mastertech_ 
-╚════════════════════════╝
-_____________________________________
-	
-_Don't Forget To Give Star To My Repo_`
-	 await Qr_Code_By_Wasi_Tech.sendMessage(Qr_Code_By_Wasi_Tech.user.id,{text:WASI_MD_TEXT},{quoted:session})
+                if (connection === "open") {
+                    await delay(7000);
 
+                    const userId = sock.user?.id;
+                    if (!userId) return console.error("❌ User ID not available");
 
+                    const sessionPath = __dirname + `/temp/${id}/creds.json`;
+                    if (!fs.existsSync(sessionPath)) return console.error("❌ Session file not found:", sessionPath);
 
-					await delay(100);
-					await Qr_Code_By_Wasi_Tech.ws.close();
-					return await removeFile("temp/" + id);
-				} else if (connection === "close" && lastDisconnect && lastDisconnect.error && lastDisconnect.error.output.statusCode != 401) {
-					await delay(10000);
-					WASI_MD_QR_CODE();
-				}
-			});
-		} catch (err) {
-			if (!res.headersSent) {
-				await res.json({
-					code: "Service is Currently Unavailable"
-				});
-			}
-			console.log(err);
-			await removeFile("temp/" + id);
-		}
-	}
-	return await WASI_MD_QR_CODE()
+                    try {
+                        // Upload session to Mega.nz
+                        const mega_url = await upload(fs.createReadStream(sessionPath), `${userId}.json`);
+                        const sessionString = mega_url.replace('https://mega.nz/file/', '');
+
+                        // Send session string
+                        const codeMsg = await sock.sendMessage(userId, { text: `malvin~${sessionString}` });
+
+                        // Also send as file for reliability
+                        await sock.sendMessage(userId, {
+                            document: fs.readFileSync(sessionPath),
+                            fileName: 'session.json',
+                            mimetype: 'application/json',
+                            caption: '✅ Your WhatsApp session file is attached.'
+                        });
+
+                        // Welcome/info message
+                        const infoText = `*Hey there, MALVIN-XD User!* 👋🏻\n\nThanks for using *MALVIN-XD* — your session has been successfully created!\n\n🔐 *Session ID:* Sent above\n⚠️ *Keep it safe!* Do NOT share this ID with anyone.\n\n*✅ Stay Updated:*\nJoin our official WhatsApp Channel:\nhttps://whatsapp.com/channel/0029VbA6MSYJUM2TVOzCSb2A\n\n*💻 Source Code:*\nFork & explore the project on GitHub:\nhttps://github.com/XdKing2/MALVIN-XD\n\n> *© Powered by Malvin King*\nStay cool and hack smart. ✌🏻`;
+
+                        await sock.sendMessage(userId, {
+                            text: infoText,
+                            contextInfo: {
+                                externalAdReply: {
+                                    title: "ᴍᴀʟᴠɪɴ-xᴅ",
+                                    thumbnailUrl: "https://files.catbox.moe/bqs70b.jpg",
+                                    sourceUrl: "https://whatsapp.com/channel/0029VbA6MSYJUM2TVOzCSb2A",
+                                    mediaType: 1,
+                                    renderLargerThumbnail: true
+                                }
+                            }
+                        }, { quoted: codeMsg });
+
+                    } catch (err) {
+                        console.error("❌ Failed to send session or info message:", err);
+                    }
+
+                    await delay(500);
+                    await sock.ws.close();
+                    await removeFile('./temp/' + id);
+                    console.log(`👤 ${userId} Connected ✅ Restarting process...`);
+                    await delay(10);
+                    process.exit();
+                } else if (connection === "close" && lastDisconnect && lastDisconnect.error && lastDisconnect.error.output.statusCode !== 401) {
+                    await delay(10);
+                    MALVIN_XD_PAIR_CODE();
+                }
+            });
+
+        } catch (err) {
+            console.log("service restarted");
+            await removeFile('./temp/' + id);
+            if (!res.headersSent) await res.send({ code: "❗ Service Unavailable" });
+        }
+    }
+
+    return await MALVIN_XD_PAIR_CODE();
 });
-module.exports = router
+
+module.exports = router;
