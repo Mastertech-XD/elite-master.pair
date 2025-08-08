@@ -1,0 +1,22 @@
+{
+    "name": "Elite Session Generator",
+    "description": "I'm Web Session Generator by Masterpeace Elite",
+    "logo": "",
+    "repository": "https://github.com/Mastertech-XD/Elite-pair",
+    "keywords": ["@Xcelsama"],
+    "success_url": "/", 
+    "buildpacks": [{ "url": "https://github.com/heroku/heroku-buildpack-nodejs#latest" } ],
+    "env": {      
+      "PORT": {
+        "description": "Port for web app.4000,5000,3000... any!",
+        "value": "5000",
+        "required": false 
+      },
+      "MESSAGE": {
+        "description": "",
+        "value": "",
+        "required": false 
+      }
+    }   
+
+}
