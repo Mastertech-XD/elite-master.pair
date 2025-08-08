@@ -1,134 +1,122 @@
-const PastebinAPI = require('pastebin-js'),
-pastebin = new PastebinAPI('EMWTMkQAVfJa9kM-MRUrxd5Oku1U7pgL')
-const {makeid} = require('./id');
 const express = require('express');
 const fs = require('fs');
-let router = express.Router()
 const pino = require("pino");
-const {
-    default: Gifted_Tech,
-    useMultiFileAuthState,
-    delay,
-    makeCacheableSignalKeyStore,
-    Browsers
-} = require("maher-zubair-baileys");
+const { makeWASocket, useMultiFileAuthState, delay, Browsers } = require("@whiskeysockets/baileys"); // Using official package
+const router = express.Router();
 
-function removeFile(FilePath){
-    if(!fs.existsSync(FilePath)) return false;
-    fs.rmSync(FilePath, { recursive: true, force: true })
-};
+// Debug logger
+const logger = pino({ level: 'debug' }).child({ module: 'pairing' });
+
+async function removeFile(FilePath) {
+    if (fs.existsSync(FilePath)) {
+        fs.rmSync(FilePath, { recursive: true, force: true });
+    }
+}
 
 router.get('/', async (req, res) => {
-    const id = makeid();
-    let num = req.query.number;
-    
-    if (!num) {
-        return res.status(400).send({ error: "Phone number is required" });
+    const sessionId = Date.now().toString(); // Unique session ID
+    const num = req.query.number?.replace(/[^0-9]/g, '');
+
+    if (!num || num.length < 10) {
+        return res.status(400).json({ error: "Valid phone number required" });
     }
 
-    async function GIFTED_MD_PAIR_CODE() {
-        const { state, saveCreds } = await useMultiFileAuthState('./temp/'+id);
+    logger.debug(`Starting pairing for number: ${num}`);
+
+    try {
+        const { state, saveCreds } = await useMultiFileAuthState(`./temp/${sessionId}`);
         
-        try {
-            let Pair_Code_By_Gifted_Tech = Gifted_Tech({
-                auth: {
-                    creds: state.creds,
-                    keys: makeCacheableSignalKeyStore(state.keys, pino({level: "fatal"}).child({level: "fatal"})),
-                },
-                printQRInTerminal: false,
-                logger: pino({level: "fatal"}).child({level: "fatal"}),
-                browser: [Browsers.Chrome, 'Windows 10', 'Chrome/89.0.4389.82'],
-                version: [2, 2413, 1] // Explicit version
-            });
+        const sock = makeWASocket({
+            auth: {
+                creds: state.creds,
+                keys: state.keys,
+            },
+            printQRInTerminal: false,
+            logger: logger,
+            browser: Browsers.ubuntu('Chrome'),
+            version: [3, 5254, 11] // Latest stable version
+        });
 
-            if(!Pair_Code_By_Gifted_Tech.authState.creds.registered) {
-                await delay(1500);
-                
-                // Proper number formatting
-                num = num.replace(/[^0-9]/g, '');
-                if (!num.startsWith('')) { // Ensure country code
-                    num = '254' + num; // Example: Kenya country code
-                }
-                
-                try {
-                    const code = await Pair_Code_By_Gifted_Tech.requestPairingCode(num);
-                    if(!res.headersSent) {
-                        res.send({ code });
-                    }
-                } catch (pairingError) {
-                    console.error('Pairing failed:', pairingError);
-                    if(!res.headersSent) {
-                        res.status(500).send({ error: "Failed to generate pairing code" });
-                    }
-                    return;
-                }
-            }
+        sock.ev.on('creds.update', saveCreds);
 
-            Pair_Code_By_Gifted_Tech.ev.on('creds.update', saveCreds);
+        if (!sock.authState.creds.registered) {
+            logger.debug('Account not registered, requesting pairing code...');
             
-            Pair_Code_By_Gifted_Tech.ev.on("connection.update", async (update) => {
-                const { connection, lastDisconnect } = update;
+            try {
+                // Format number with country code if missing
+                const formattedNum = num.startsWith('') ? num : `254${num}`; // Kenya example
+                const code = await sock.requestPairingCode(formattedNum);
+                logger.debug(`Pairing code generated: ${code}`);
                 
-                if (connection === "open") {
-                    await delay(3000);
-                    
-                    // Save session data
-                    let data = fs.readFileSync(__dirname + `/temp/${id}/creds.json`);
-                    let b64data = Buffer.from(data).toString('base64');
-                    await Pair_Code_By_Gifted_Tech.sendMessage(
-                        Pair_Code_By_Gifted_Tech.user.id, 
-                        { text: b64data }
-                    );
-                    
-                    // Send connection message (keeping original)
-                    const GIFTED_MD_TEXT = `
-*_Session Connected By MASTERTECH_*
-*_Made With 🤍_*
-______________________________________
-╔════◇
-║ *『AMAZING YOU'VE CHOSEN MASTERTECH-XD』*
-║ _You Have Completed the First Step to Deploy a Whatsapp Bot._
-╚════════════════════════╝
-╔═════◇
-║  『••• 𝗩𝗶𝘀𝗶𝘁 𝗙𝗼𝗿 𝗛𝗲𝗹𝗽 •••』
-║❒ *Ytube:* _youtube.com/@mastertech
-║❒ *Owner:* _https://wa.me/254743727510_
-║❒ *Repo:* _https://github.com/Mastertech-XD/Mastertech_
-║❒ *WaGroup:* _https://whatsapp.com/channel/0029VazeyYx35fLxhB5TfC3D_
-║❒ *Plugins:* _https://github.com/Mastertech-XD/Mastertech_ 
-╚════════════════════════╝
-_____________________________________
-	
-_Don't Forget To Give Star To My Repo_`;
-                    
-                    await Pair_Code_By_Gifted_Tech.sendMessage(
-                        Pair_Code_By_Gifted_Tech.user.id,
-                        { text: GIFTED_MD_TEXT }
-                    );
-                    
-                    // Clean up
-                    await delay(100);
-                    await Pair_Code_By_Gifted_Tech.ws.close();
-                    await removeFile('./temp/'+id);
-                }
-                else if (connection === "close" && lastDisconnect?.error) {
-                    console.log('Connection closed, attempting reconnect...');
-                    await delay(10000);
-                    await removeFile('./temp/'+id);
-                    GIFTED_MD_PAIR_CODE().catch(e => console.error('Reconnect failed:', e));
-                }
-            });
-
-        } catch (err) {
-            console.error("Error in pairing process:", err);
-            await removeFile('./temp/'+id);
-            if(!res.headersSent) {
-                res.status(500).send({ error: "Pairing service unavailable" });
+                return res.json({ 
+                    code: code,
+                    message: "Enter this code in your phone's WhatsApp Linked Devices section"
+                });
+            } catch (pairError) {
+                logger.error('Pairing failed:', pairError);
+                await removeFile(`./temp/${sessionId}`);
+                return res.status(500).json({ 
+                    error: "Pairing failed",
+                    details: pairError.message 
+                });
             }
         }
+
+        sock.ev.on("connection.update", async (update) => {
+            logger.debug('Connection update:', update);
+            
+            if (update.connection === "open") {
+                logger.debug('Connection established, sending session data...');
+                
+                try {
+                    // Send session data to user
+                    const sessionData = fs.readFileSync(`./temp/${sessionId}/creds.json`);
+                    await sock.sendMessage(
+                        sock.user.id, 
+                        { text: Buffer.from(sessionData).toString('base64') }
+                    );
+                    
+                    // Send welcome message
+                    await sock.sendMessage(
+                        sock.user.id,
+                        { text: `*Session Connected!*\n\nYour WhatsApp bot session is now active.` }
+                    );
+                    
+                    logger.debug('Session transfer complete, cleaning up...');
+                    await sock.ws.close();
+                    await removeFile(`./temp/${sessionId}`);
+                } catch (e) {
+                    logger.error('Session transfer failed:', e);
+                }
+            }
+            else if (update.connection === "close") {
+                logger.warn('Connection closed', update.lastDisconnect?.error);
+                await removeFile(`./temp/${sessionId}`);
+            }
+        });
+
+        // Timeout after 2 minutes
+        setTimeout(async () => {
+            if (!sock.authState.creds.registered) {
+                logger.warn('Pairing timeout reached');
+                await sock.ws.close();
+                await removeFile(`./temp/${sessionId}`);
+                if (!res.headersSent) {
+                    res.status(408).json({ error: "Pairing timeout" });
+                }
+            }
+        }, 120000);
+
+    } catch (err) {
+        logger.error('Critical error:', err);
+        await removeFile(`./temp/${sessionId}`);
+        if (!res.headersSent) {
+            res.status(500).json({ 
+                error: "Internal server error",
+                details: err.message 
+            });
+        }
     }
-    
-    return GIFTED_MD_PAIR_CODE();
 });
 
 module.exports = router;
