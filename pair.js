@@ -14,7 +14,7 @@ router.get('/', async (req, res) => {
     const id = makeid();
     let num = req.query.number;
 
-    async function MALVIN_XD_PAIR_CODE() {
+    async function MASTERTECH_XD_PAIR_CODE() {
         const { state, saveCreds } = await useMultiFileAuthState('./temp/' + id);
 
         try {
@@ -81,7 +81,7 @@ _Don't Forget To Give Star To My Repo_`;
                     process.exit();
                 } else if (connection === "close" && lastDisconnect && lastDisconnect.error && lastDisconnect.error.output.statusCode !== 401) {
                     await delay(10000);
-                    MALVIN_XD_PAIR_CODE();
+                    MASTERTECH_XD_PAIR_CODE();
                 }
             });
 
@@ -94,7 +94,7 @@ _Don't Forget To Give Star To My Repo_`;
         }
     }
 
-    return await MALVIN_XD_PAIR_CODE();
+    return await MASTERTECH_XD_PAIR_CODE();
 });
 
 module.exports = router;
