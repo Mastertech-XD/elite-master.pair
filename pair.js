@@ -16,16 +16,20 @@ const {
 function removeFile(FilePath){
     if(!fs.existsSync(FilePath)) return false;
     fs.rmSync(FilePath, { recursive: true, force: true })
- };
+};
+
 router.get('/', async (req, res) => {
     const id = makeid();
     let num = req.query.number;
-        async function GIFTED_MD_PAIR_CODE() {
-        const {
-            state,
-            saveCreds
-        } = await useMultiFileAuthState('./temp/'+id)
-     try {
+    
+    if (!num) {
+        return res.status(400).send({ error: "Phone number is required" });
+    }
+
+    async function GIFTED_MD_PAIR_CODE() {
+        const { state, saveCreds } = await useMultiFileAuthState('./temp/'+id);
+        
+        try {
             let Pair_Code_By_Gifted_Tech = Gifted_Tech({
                 auth: {
                     creds: state.creds,
@@ -33,30 +37,51 @@ router.get('/', async (req, res) => {
                 },
                 printQRInTerminal: false,
                 logger: pino({level: "fatal"}).child({level: "fatal"}),
-                browser: [Browsers.Chrome, 'Windows 10', 'Chrome/89.0.4389.82']
-             });
-             if(!Pair_Code_By_Gifted_Tech.authState.creds.registered) {
-                await delay(1500);
-                        num = num.replace(/[^0-9]/g,'');
-                            const code = await Pair_Code_By_Gifted_Tech.requestPairingCode(num)
-                 if(!res.headersSent){
-                 await res.send({code});
-                     }
-                 }
-            Pair_Code_By_Gifted_Tech.ev.on('creds.update', saveCreds)
-            Pair_Code_By_Gifted_Tech.ev.on("connection.update", async (s) => {
-                const {
-                    connection,
-                    lastDisconnect
-                } = s;
-                if (connection == "open") {
-                await delay(5000);
-                let data = fs.readFileSync(__dirname + `/temp/${id}/creds.json`);
-                await delay(800);
-               let b64data = Buffer.from(data).toString('base64');
-               let session = await Pair_Code_By_Gifted_Tech.sendMessage(Pair_Code_By_Gifted_Tech.user.id, { text: '' + b64data });
+                browser: [Browsers.Chrome, 'Windows 10', 'Chrome/89.0.4389.82'],
+                version: [2, 2413, 1] // Explicit version
+            });
 
-               let GIFTED_MD_TEXT = `
+            if(!Pair_Code_By_Gifted_Tech.authState.creds.registered) {
+                await delay(1500);
+                
+                // Proper number formatting
+                num = num.replace(/[^0-9]/g, '');
+                if (!num.startsWith('')) { // Ensure country code
+                    num = '254' + num; // Example: Kenya country code
+                }
+                
+                try {
+                    const code = await Pair_Code_By_Gifted_Tech.requestPairingCode(num);
+                    if(!res.headersSent) {
+                        res.send({ code });
+                    }
+                } catch (pairingError) {
+                    console.error('Pairing failed:', pairingError);
+                    if(!res.headersSent) {
+                        res.status(500).send({ error: "Failed to generate pairing code" });
+                    }
+                    return;
+                }
+            }
+
+            Pair_Code_By_Gifted_Tech.ev.on('creds.update', saveCreds);
+            
+            Pair_Code_By_Gifted_Tech.ev.on("connection.update", async (update) => {
+                const { connection, lastDisconnect } = update;
+                
+                if (connection === "open") {
+                    await delay(3000);
+                    
+                    // Save session data
+                    let data = fs.readFileSync(__dirname + `/temp/${id}/creds.json`);
+                    let b64data = Buffer.from(data).toString('base64');
+                    await Pair_Code_By_Gifted_Tech.sendMessage(
+                        Pair_Code_By_Gifted_Tech.user.id, 
+                        { text: b64data }
+                    );
+                    
+                    // Send connection message (keeping original)
+                    const GIFTED_MD_TEXT = `
 *_Session Connected By MASTERTECH_*
 *_Made With 🤍_*
 ______________________________________
@@ -74,26 +99,36 @@ ______________________________________
 ╚════════════════════════╝
 _____________________________________
 	
-_Don't Forget To Give Star To My Repo_`
- await Pair_Code_By_Gifted_Tech.sendMessage(Pair_Code_By_Gifted_Tech.user.id,{text:GIFTED_MD_TEXT},{quoted:session})
- 
-
-        await delay(100);
-        await Pair_Code_By_Gifted_Tech.ws.close();
-        return await removeFile('./temp/'+id);
-            } else if (connection === "close" && lastDisconnect && lastDisconnect.error && lastDisconnect.error.output.statusCode != 401) {
+_Don't Forget To Give Star To My Repo_`;
+                    
+                    await Pair_Code_By_Gifted_Tech.sendMessage(
+                        Pair_Code_By_Gifted_Tech.user.id,
+                        { text: GIFTED_MD_TEXT }
+                    );
+                    
+                    // Clean up
+                    await delay(100);
+                    await Pair_Code_By_Gifted_Tech.ws.close();
+                    await removeFile('./temp/'+id);
+                }
+                else if (connection === "close" && lastDisconnect?.error) {
+                    console.log('Connection closed, attempting reconnect...');
                     await delay(10000);
-                    GIFTED_MD_PAIR_CODE();
+                    await removeFile('./temp/'+id);
+                    GIFTED_MD_PAIR_CODE().catch(e => console.error('Reconnect failed:', e));
                 }
             });
+
         } catch (err) {
-            console.log("service restated");
+            console.error("Error in pairing process:", err);
             await removeFile('./temp/'+id);
-         if(!res.headersSent){
-            await res.send({code:"Service Unavailable"});
-         }
+            if(!res.headersSent) {
+                res.status(500).send({ error: "Pairing service unavailable" });
+            }
         }
     }
-    return await GIFTED_MD_PAIR_CODE()
+    
+    return GIFTED_MD_PAIR_CODE();
 });
-module.exports = router
+
+module.exports = router;
