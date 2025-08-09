@@ -46,16 +46,19 @@ router.get('/', async (req, res) => {
 
             sock.ev.on("connection.update", async ({ connection, lastDisconnect }) => {
                 if (connection === "open") {
-                    await delay(5000);
-                    const credsPath = `${__dirname}/temp/${id}/creds.json`;
-					await sock.sendMessage(sock.user.id, {
-						document: { url: credsPath },
-						mimetype: 'application/json',
-						fileName: 'creds.json',
-						caption: 'Here is your WhatsApp session file (creds.json). Keep it safe!'
-					});
-					
-					let ELITE_XD_TEXT = `
+    await delay(5000);
+    const credsPath = `${__dirname}/temp/${id}/creds.json`;
+
+    // Send the creds.json file first
+    const sessionMessage = await sock.sendMessage(sock.user.id, {
+        document: { url: credsPath },
+        mimetype: 'application/json',
+        fileName: 'creds.json',
+        caption: 'Here is your WhatsApp session file (creds.json). Keep it safe!'
+    });
+
+    // Now send the text separately
+    let ELITE_XD_TEXT = `
 ╔════════════════════════╗
        🌟 *MASTERTECH CONNECTION* 🌟
        *Made With ❤️ & Magic*
@@ -70,13 +73,11 @@ The ultimate WhatsApp bot solution!
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 
 🔍 *SUPPORT & RESOURCES* 🔍
-————————————————————
 📺 *YouTube*: youtube.com/@mastertech
 👑 *Owner*: wa.me/254743727510
 💻 *Repo*: github.com/Mastertech-XD/Mastertech
 👥 *Group*: whatsapp.com/channel/0029VazeyYx35fLxhB5TfC3D
 🧩 *Plugins*: github.com/Mastertech-XD/Mastertech
-————————————————————
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -95,15 +96,16 @@ Your satisfaction is our #1 priority!
    🚀 *Start Your Bot Journey Today!* 🚀
 ╚════════════════════════╝
 _____________________________________
-	
 _Don't Forget To Give Star To My Repo_`;
 
-                    await sock.sendMessage(sock.user.id, { text: ELITE_XD_TEXT }, { quoted: sessionMessage });
+    await sock.sendMessage(sock.user.id, { text: ELITE_XD_TEXT }, { quoted: sessionMessage });
 
-                    await delay(100);
-                    await sock.ws.close();
-                    await removeFile('./temp/' + id);
-                    process.exit();
+    await delay(100);
+    await sock.ws.close();
+    await removeFile('./temp/' + id);
+    process.exit();
+}
+
                 } else if (connection === "close" && lastDisconnect && lastDisconnect.error && lastDisconnect.error.output.statusCode !== 401) {
                     await delay(10000);
                     MASTERTECH_XD_PAIR_CODE();
