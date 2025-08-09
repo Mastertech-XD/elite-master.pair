@@ -1,147 +1,489 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Knight Bot</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MASTERTECH-XD</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>
   <style>
+    :root {
+      --primary-color: #000000;
+      --secondary-color: #ffffff;
+      --accent-color: #f0f0f0;
+      --text-color: #000000;
+      --background-color: #ffffff;
+      --hover-color: #f5f5f5;
+      --border-color: rgba(0, 0, 0, 0.1);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      background-color: #ffffff;
-      color: #000000;
+      font-family: 'Inter', sans-serif;
+      background: var(--background-color);
+      color: var(--text-color);
+      min-height: 100vh;
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
-      margin: 0;
-      padding: 20px;
-      line-height: 1.5;
+      padding: 15px;
     }
-    
+
     .container {
-      max-width: 300px;
       width: 100%;
-      background-color: #ffffff;
-      padding: 0;
+      max-width: 400px;
+      background: var(--background-color);
+      border-radius: 16px;
+      padding: 25px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+      border: 1px solid var(--border-color);
     }
-    
-    h1 {
-      font-size: 24px;
-      font-weight: 600;
-      margin-bottom: 5px;
+
+    .header {
       text-align: center;
-    }
-    
-    p.subtitle {
-      margin-bottom: 20px;
-      text-align: center;
-    }
-    
-    .options {
       margin-bottom: 25px;
     }
-    
-    .option {
+
+    .logo {
+      width: 70px;
+      height: 70px;
+      margin: 0 auto 16px;
+      background: var(--primary-color);
+      border-radius: 50%;
       display: flex;
       align-items: center;
-      margin-bottom: 10px;
+      justify-content: center;
+      font-size: 28px;
+      color: white;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
     }
-    
-    .option input[type="checkbox"] {
-      margin-right: 10px;
-      width: 18px;
-      height: 18px;
+
+    .title {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--primary-color);
     }
-    
-    ol {
+
+    .subtitle {
+      font-size: 14px;
+      color: rgba(0, 0, 0, 0.7);
+      margin-bottom: 20px;
+    }
+
+    .social-icons {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .social-icons a {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 18px;
+      text-decoration: none;
+      transition: all 0.3s ease;
+    }
+
+    .social-icons a.youtube { background: #FF0000; }
+    .social-icons a.telegram { background: #0088cc; }
+    .social-icons a.whatsapp { background: #0cfa10; }
+    .social-icons a.github { background: #333; }
+
+    .social-icons a:hover {
+      transform: scale(1.1);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+
+    /* Toggle Button Styling */
+    .option-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .option-button {
+      padding: 8px 16px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+
+    .option-button.selected {
+      background-color: var(--primary-color);
+      color: var(--secondary-color);
+      border-color: var(--primary-color);
+    }
+
+    /* QR Code Section */
+    .qr-container {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    #qrCodeCanvas {
+      width: 200px;
+      height: 200px;
+      margin: 0 auto;
+      background: white;
+      padding: 10px;
+      border-radius: 8px;
+    }
+
+    /* Pair Code Section */
+    .input-group {
+      margin-bottom: 20px;
+      display: none;
+    }
+
+    .input-label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      font-size: 13px;
+    }
+
+    .input-field {
+      width: 100%;
+      padding: 12px;
+      border: 1.5px solid var(--border-color);
+      border-radius: 12px;
+      background: var(--background-color);
+      color: var(--text-color);
+      font-size: 15px;
+    }
+
+    .input-field:focus {
+      outline: none;
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+    }
+
+    .generate-btn {
+      width: 100%;
+      padding: 12px;
+      background: var(--primary-color);
+      border: none;
+      border-radius: 12px;
+      color: var(--secondary-color);
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    .generate-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    /* Instructions */
+    .instructions {
+      background-color: var(--hover-color);
+      padding: 15px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      text-align: left;
+    }
+
+    .instructions ol {
       padding-left: 20px;
-      margin-bottom: 25px;
     }
-    
-    ol li {
+
+    .instructions li {
       margin-bottom: 8px;
       font-size: 14px;
     }
-    
-    .copy-section {
+
+    /* Code Display */
+    .code-display {
+      background: var(--hover-color);
+      padding: 12px;
+      border-radius: 12px;
+      text-align: center;
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      min-height: 40px;
       display: flex;
       align-items: center;
+      justify-content: center;
+      border: 1.5px solid var(--border-color);
+      display: none;
     }
-    
-    .copy-section input[type="checkbox"] {
-      margin-right: 10px;
-      width: 18px;
-      height: 18px;
+
+    .copy-btn {
+      width: 100%;
+      padding: 12px;
+      background: var(--hover-color);
+      border: 1.5px solid var(--border-color);
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      display: none;
     }
-    
+
+    .copy-btn:hover {
+      background: var(--background-color);
+      border-color: var(--primary-color);
+    }
+
+    /* Status Messages */
+    .success-message {
+      color: #000aff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 16px;
+    }
+
+    .error-message {
+      color: #e74c3c;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 14px;
+    }
+
+    .loading {
+      display: none;
+      text-align: center;
+      margin: 16px 0;
+    }
+
+    .loading i {
+      font-size: 24px;
+      color: var(--primary-color);
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Footer */
     .footer {
       text-align: center;
+      margin-top: 20px;
       font-size: 12px;
-      color: #666666;
-      margin-top: 30px;
+      color: rgba(0, 0, 0, 0.5);
+    }
+
+    @media (max-width: 480px) {
+      .container {
+        padding: 20px;
+        border-radius: 12px;
+      }
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Knight Bot</h1>
-    <p class="subtitle">Link your WhatsApp device</p>
-    
-    <div class="options">
-      <div class="option">
-        <input type="checkbox" id="pairCodeCheckbox">
-        <label for="pairCodeCheckbox">Pair Code</label>
-      </div>
-      
-      <div class="option">
-        <input type="checkbox" id="qrCodeCheckbox" checked>
-        <label for="qrCodeCheckbox">QR Code</label>
+    <div class="header">
+      <div class="logo"><i class="fas fa-robot"></i></div>
+      <h1 class="title">MASTERTECH-XD</h1>
+      <p class="subtitle">Link your WhatsApp device</p>
+      <div class="social-icons">
+        <a href="https://www.youtube.com/@?sub_confirmation=1" target="_blank" class="youtube"><i class="fab fa-youtube"></i></a>
+        <a href="https://t.me/" target="_blank" class="telegram"><i class="fab fa-telegram-plane"></i></a>
+        <a href="https://whatsapp.com/channel/0029VazeyYx35fLxhB5TfC3D" target="_blank" class="whatsapp"><i class="fab fa-whatsapp"></i></a>
+        <a href="https://github.com/Mastertech-XD/Mastertech" target="_blank" class="github"><i class="fab fa-github"></i></a>
       </div>
     </div>
-    
-    <ol>
-      <li>Open WhatsApp on your phone</li>
-      <li>Go to Settings > Linked Devices</li>
-      <li>Tap "Link a Device"</li>
-      <li>Scan the QR code above</li>
-    </ol>
-    
-    <div class="copy-section">
-      <input type="checkbox" id="copyCodeCheckbox">
-      <label for="copyCodeCheckbox">Copy Code</label>
+
+    <!-- Toggle Buttons -->
+    <div class="option-buttons">
+      <div class="option-button" id="pairCodeBtn">Pair Code</div>
+      <div class="option-button selected" id="qrCodeBtn">QR Code</div>
     </div>
-    
+
+    <!-- QR Code Section -->
+    <div class="qr-container" id="qrContainer">
+      <canvas id="qrCodeCanvas"></canvas>
+      <div class="instructions">
+        <ol>
+          <li>Open WhatsApp on your phone</li>
+          <li>Go to Settings > Linked Devices</li>
+          <li>Tap "Link a Device"</li>
+          <li>Scan the QR code above</li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- Pair Code Section -->
+    <div class="input-group" id="numberInput">
+      <label class="input-label">Enter your WhatsApp number with country code</label>
+      <input type="text" id="mobileNumber" class="input-field" placeholder="254743*******" pattern="[+][0-9]{10,}" title="Please enter country code starting with + followed by number">
+    </div>
+
+    <button class="generate-btn" id="submit">
+      <i class="fas fa-key"></i> Generate Pair Code
+    </button>
+
+    <div class="loading" id="loading">
+      <i class="fas fa-spinner"></i>
+    </div>
+
+    <div class="code-display" id="codeDisplay">
+      Your pair code will appear here
+    </div>
+
+    <button class="copy-btn" id="copy" onclick="copyCode()">
+      <i class="fas fa-copy"></i> Copy Code
+    </button>
+
     <div class="footer">
-      © 2025 Mr Unique Hacker | Knight Bot
+      <p>© 2025 MASTERPEACE ELITE | MASTERTECH-XD</p>
     </div>
   </div>
 
+  <!-- Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.0.0-alpha.1/axios.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+  
   <script>
     document.addEventListener('DOMContentLoaded', function() {
-      const pairCodeCheckbox = document.getElementById('pairCodeCheckbox');
-      const qrCodeCheckbox = document.getElementById('qrCodeCheckbox');
-      
-      // Make checkboxes behave like radio buttons
-      pairCodeCheckbox.addEventListener('change', function() {
-        if (this.checked) {
-          qrCodeCheckbox.checked = false;
+      const pairCodeBtn = document.getElementById('pairCodeBtn');
+      const qrCodeBtn = document.getElementById('qrCodeBtn');
+      const qrContainer = document.getElementById('qrContainer');
+      const numberInput = document.getElementById('numberInput');
+      const generateBtn = document.getElementById('submit');
+      const codeDisplay = document.getElementById('codeDisplay');
+      const copyBtn = document.getElementById('copy');
+      const loadingSpinner = document.getElementById('loading');
+      let qrGenerated = false;
+
+      // Initialize with QR code view
+      generateQRCode();
+
+      // Toggle between views
+      pairCodeBtn.addEventListener('click', function() {
+        pairCodeBtn.classList.add('selected');
+        qrCodeBtn.classList.remove('selected');
+        qrContainer.style.display = 'none';
+        numberInput.style.display = 'block';
+        generateBtn.style.display = 'block';
+        codeDisplay.style.display = 'none';
+        copyBtn.style.display = 'none';
+      });
+
+      qrCodeBtn.addEventListener('click', function() {
+        qrCodeBtn.classList.add('selected');
+        pairCodeBtn.classList.remove('selected');
+        qrContainer.style.display = 'block';
+        numberInput.style.display = 'none';
+        generateBtn.style.display = 'none';
+        codeDisplay.style.display = 'none';
+        copyBtn.style.display = 'none';
+        
+        if (!qrGenerated) {
+          generateQRCode();
         }
       });
-      
-      qrCodeCheckbox.addEventListener('change', function() {
-        if (this.checked) {
-          pairCodeCheckbox.checked = false;
+
+      // Generate QR Code
+      function generateQRCode() {
+        loadingSpinner.style.display = 'block';
+        qrContainer.style.display = 'none';
+        
+        axios.get('/qr?number=' + Date.now()) // Add timestamp to prevent caching
+          .then(response => {
+            const qrData = response.data.qr;
+            QRCode.toCanvas(document.getElementById('qrCodeCanvas'), qrData, 
+              { width: 200, margin: 1 }, 
+              function(error) {
+                loadingSpinner.style.display = 'none';
+                qrContainer.style.display = 'block';
+                qrGenerated = true;
+                if (error) {
+                  console.error('QR generation error:', error);
+                  document.getElementById('qrCodeCanvas').getContext('2d').fillText('QR Generation Failed', 10, 50);
+                }
+              }
+            );
+          })
+          .catch(error => {
+            console.error('QR fetch error:', error);
+            loadingSpinner.style.display = 'none';
+            document.getElementById('qrCodeCanvas').getContext('2d').fillText('Failed to load QR', 10, 50);
+            qrContainer.style.display = 'block';
+          });
+      }
+
+      // Pair Code Generation
+      document.getElementById("submit").addEventListener("click", async (e) => {
+        e.preventDefault();
+        const mobileNumberInput = document.getElementById("mobileNumber");
+        const mobileNumber = mobileNumberInput.value.trim();
+        
+        if (!mobileNumber) {
+          codeDisplay.innerHTML = '<div class="error-message"><i class="fas fa-exclamation-circle"></i> Please enter your WhatsApp number</div>';
+          codeDisplay.style.display = 'flex';
+          return;
         }
-      });
-      
-      // Prevent both from being unchecked
-      [pairCodeCheckbox, qrCodeCheckbox].forEach(checkbox => {
-        checkbox.addEventListener('click', function() {
-          if (!this.checked && !pairCodeCheckbox.checked && !qrCodeCheckbox.checked) {
-            this.checked = true;
+
+        loadingSpinner.style.display = "block";
+        codeDisplay.style.display = 'none';
+        copyBtn.style.display = 'none';
+
+        try {
+          const response = await axios.get(`/pair?number=${encodeURIComponent(mobileNumber)}`);
+          const code = response.data.code || "Service Unavailable";
+          
+          if (code === "Service Unavailable") {
+            codeDisplay.innerHTML = '<div class="error-message"><i class="fas fa-exclamation-circle"></i> Service Unavailable</div>';
+          } else {
+            codeDisplay.innerHTML = `<div class="success-message"><i class="fas fa-check-circle"></i> CODE: ${code}</div>`;
+            copyBtn.style.display = 'flex';
           }
-        });
+          codeDisplay.style.display = 'flex';
+        } catch (error) {
+          console.error("Error generating code:", error);
+          codeDisplay.innerHTML = '<div class="error-message"><i class="fas fa-exclamation-circle"></i> Error generating code. Please try again.</div>';
+          codeDisplay.style.display = 'flex';
+        } finally {
+          loadingSpinner.style.display = "none";
+        }
       });
+
+      // Copy Functionality
+      function copyCode() {
+        const codeDisplay = document.getElementById("codeDisplay").innerText;
+        const code = codeDisplay.replace('CODE: ', '');
+        navigator.clipboard.writeText(code).then(() => {
+          const copyBtn = document.getElementById("copy");
+          const originalText = copyBtn.innerHTML;
+          copyBtn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+          setTimeout(() => {
+            copyBtn.innerHTML = originalText;
+          }, 2000);
+        }).catch(err => {
+          console.error("Failed to copy text: ", err);
+        });
+      }
     });
   </script>
 </body>
