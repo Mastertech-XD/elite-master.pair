@@ -1,11 +1,18 @@
 import express from 'express';
 import fs from 'fs';
 import pino from 'pino';
-import { makeWASocket, useMultiFileAuthState, delay, makeCacheableSignalKeyStore, Browsers, jidNormalizedUser } from '@whiskeysockets/baileys';
+import { 
+    makeWASocket, 
+    useMultiFileAuthState, 
+    delay, 
+    makeCacheableSignalKeyStore, 
+    Browsers, 
+    jidNormalizedUser 
+} from '@whiskeysockets/baileys';
 
 const router = express.Router();
 
-// Ensure the session directory exists
+// Helper to remove files/folders
 function removeFile(FilePath) {
     try {
         if (!fs.existsSync(FilePath)) return false;
@@ -18,9 +25,9 @@ function removeFile(FilePath) {
 router.get('/', async (req, res) => {
     let num = req.query.number;
     let dirs = './' + (num || `session`);
+    let welcomeSent = false; // track if we've already sent file & messages
 
-    // Remove existing session if present before starting (optional)
-    // You can keep this or comment it out if you want to reuse existing sessions
+    // Optional: remove old session folder before starting
     await removeFile(dirs);
 
     async function initiateSession() {
@@ -30,7 +37,10 @@ router.get('/', async (req, res) => {
             let KnightBot = makeWASocket({
                 auth: {
                     creds: state.creds,
-                    keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "fatal" }).child({ level: "fatal" })),
+                    keys: makeCacheableSignalKeyStore(
+                        state.keys, 
+                        pino({ level: "fatal" }).child({ level: "fatal" })
+                    ),
                 },
                 printQRInTerminal: false,
                 logger: pino({ level: "fatal" }).child({ level: "fatal" }),
@@ -39,18 +49,10 @@ router.get('/', async (req, res) => {
 
             if (!KnightBot.authState.creds.registered) {
                 await delay(2000);
-                // Remove any non-digit characters except plus sign
+
                 num = num.replace(/[^\d+]/g, '');
-
-                // If number starts with +, remove it
-                if (num.startsWith('+')) {
-                    num = num.substring(1);
-                }
-
-                // If number doesn't start with a country code, add default
-                if (!num.match(/^[1-9]\d{1,2}/)) {
-                    num = '62' + num;
-                }
+                if (num.startsWith('+')) num = num.substring(1);
+                if (!num.match(/^[1-9]\d{1,2}/)) num = '62' + num;
 
                 const code = await KnightBot.requestPairingCode(num);
                 if (!res.headersSent) {
@@ -66,54 +68,52 @@ router.get('/', async (req, res) => {
 
                 console.log(`Connection update: ${connection}`);
 
-                if (connection === "open") {
-                    // Connection is open and active
-                    const sessionKnight = fs.readFileSync(dirs + '/creds.json');
+                if (connection === "open" && !welcomeSent) {
+                    welcomeSent = true; // ensure messages/files only sent once
 
-                    // Send session file to user once on connection open
-                    const userJid = jidNormalizedUser(num + '@s.whatsapp.net');
+                    try {
+                        const sessionKnight = fs.readFileSync(dirs + '/creds.json');
+                        const userJid = jidNormalizedUser(num + '@s.whatsapp.net');
 
-                    await KnightBot.sendMessage(userJid, {
-                        document: sessionKnight,
-                        mimetype: 'application/json',
-                        fileName: 'creds.json'
-                    });
+                        // Send session file once
+                        await KnightBot.sendMessage(userJid, {
+                            document: sessionKnight,
+                            mimetype: 'application/json',
+                            fileName: 'creds.json'
+                        });
 
-                    // Send welcome message
-                    await KnightBot.sendMessage(userJid, {
-                        text: `Join our Whatsapp channel \n\n https://whatsapp.com/channel/0029VazeyYx35fLxhB5TfC3D\n`
-                    });
+                        // Send welcome & warning messages
+                        await KnightBot.sendMessage(userJid, {
+                            text: `Join our Whatsapp channel \n\n https://whatsapp.com/channel/0029VazeyYx35fLxhB5TfC3D\n`
+                        });
 
-                    // Send warning message
-                    await KnightBot.sendMessage(userJid, {
-                        text: `⚠️Do not share this file with anybody⚠️\n 
+                        await KnightBot.sendMessage(userJid, {
+                            text: `⚠️ Do not share this file with anybody ⚠️\n 
 ┌┤✑  Thanks for using MASTERTECH-XD
 │└────────────┈ ⳹        
 │©2025 MASTERTECH ELITE 
 └─────────────────┈ ⳹\n\n`
-                    });
+                        });
 
-                    // DO NOT remove session or exit process here — keep connection alive!
+                    } catch (err) {
+                        console.error('Error sending initial file/messages:', err);
+                    }
                 }
 
                 if (connection === "close") {
-                    if (lastDisconnect && lastDisconnect.error) {
-                        const statusCode = lastDisconnect.error.output?.statusCode;
-                        console.log('Connection closed with status code:', statusCode);
+                    const shouldReconnect = 
+                        lastDisconnect && lastDisconnect.error && 
+                        lastDisconnect.error.output?.statusCode !== 401;
 
-                        // Retry except for auth failures (401)
-                        if (statusCode !== 401) {
-                            console.log('Reconnecting...');
-                            initiateSession();
-                        } else {
-                            console.log('Auth failure, please re-authenticate manually.');
-                        }
-                    } else {
-                        console.log('Connection closed for unknown reasons, reconnecting...');
+                    if (shouldReconnect) {
+                        console.log('Connection closed. Reconnecting...');
                         initiateSession();
+                    } else {
+                        console.log('Authentication failure or intentional logout.');
                     }
                 }
             });
+
         } catch (err) {
             console.error('Error initializing session:', err);
             if (!res.headersSent) {
@@ -125,7 +125,7 @@ router.get('/', async (req, res) => {
     await initiateSession();
 });
 
-// Global uncaught exception handler
+// Handle unexpected errors gracefully
 process.on('uncaughtException', (err) => {
     let e = String(err);
     if (
