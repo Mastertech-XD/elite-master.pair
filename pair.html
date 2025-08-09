@@ -105,7 +105,6 @@
       box-shadow: 0 4px 12px rgba(0,0,0,0.2);
     }
 
-    /* Toggle Button Styling */
     .option-buttons {
       display: flex;
       justify-content: center;
@@ -128,7 +127,6 @@
       border-color: var(--primary-color);
     }
 
-    /* QR Code Section */
     .qr-container {
       text-align: center;
       margin-bottom: 20px;
@@ -143,7 +141,6 @@
       border-radius: 8px;
     }
 
-    /* Pair Code Section */
     .input-group {
       margin-bottom: 20px;
       display: none;
@@ -192,7 +189,6 @@
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     }
 
-    /* Instructions */
     .instructions {
       background-color: var(--hover-color);
       padding: 15px;
@@ -210,7 +206,6 @@
       font-size: 14px;
     }
 
-    /* Code Display */
     .code-display {
       background: var(--hover-color);
       padding: 12px;
@@ -248,7 +243,6 @@
       border-color: var(--primary-color);
     }
 
-    /* Status Messages */
     .success-message {
       color: #000aff;
       display: flex;
@@ -284,7 +278,6 @@
       100% { transform: rotate(360deg); }
     }
 
-    /* Footer */
     .footer {
       text-align: center;
       margin-top: 20px;
@@ -314,13 +307,11 @@
       </div>
     </div>
 
-    <!-- Toggle Buttons -->
     <div class="option-buttons">
       <div class="option-button" id="pairCodeBtn">Pair Code</div>
       <div class="option-button selected" id="qrCodeBtn">QR Code</div>
     </div>
 
-    <!-- QR Code Section -->
     <div class="qr-container" id="qrContainer">
       <canvas id="qrCodeCanvas"></canvas>
       <div class="instructions">
@@ -333,10 +324,9 @@
       </div>
     </div>
 
-    <!-- Pair Code Section -->
     <div class="input-group" id="numberInput">
       <label class="input-label">Enter your WhatsApp number with country code</label>
-      <input type="text" id="mobileNumber" class="input-field" placeholder="254743*******" pattern="[+][0-9]{10,}" title="Please enter country code starting with + followed by number">
+      <input type="text" id="mobileNumber" class="input-field" placeholder="+254743727510" pattern="[+][0-9]{10,}" title="Please enter country code starting with + followed by number">
     </div>
 
     <button class="generate-btn" id="submit">
@@ -360,7 +350,6 @@
     </div>
   </div>
 
-  <!-- Libraries -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.0.0-alpha.1/axios.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
   
@@ -374,10 +363,10 @@
       const codeDisplay = document.getElementById('codeDisplay');
       const copyBtn = document.getElementById('copy');
       const loadingSpinner = document.getElementById('loading');
-      let qrGenerated = false;
+      let qrEventSource = null;
 
       // Initialize with QR code view
-      generateQRCode();
+      initQRCodeSession();
 
       // Toggle between views
       pairCodeBtn.addEventListener('click', function() {
@@ -388,6 +377,12 @@
         generateBtn.style.display = 'block';
         codeDisplay.style.display = 'none';
         copyBtn.style.display = 'none';
+        
+        // Close QR code connection
+        if (qrEventSource) {
+          qrEventSource.close();
+          qrEventSource = null;
+        }
       });
 
       qrCodeBtn.addEventListener('click', function() {
@@ -399,38 +394,60 @@
         codeDisplay.style.display = 'none';
         copyBtn.style.display = 'none';
         
-        if (!qrGenerated) {
-          generateQRCode();
-        }
+        initQRCodeSession();
       });
 
-      // Generate QR Code
-      function generateQRCode() {
+      // Initialize QR Code Session with Server-Sent Events
+      function initQRCodeSession() {
         loadingSpinner.style.display = 'block';
         qrContainer.style.display = 'none';
         
-        axios.get('/qr?number=' + Date.now()) // Add timestamp to prevent caching
-          .then(response => {
-            const qrData = response.data.qr;
-            QRCode.toCanvas(document.getElementById('qrCodeCanvas'), qrData, 
+        // Clear previous QR code
+        const canvas = document.getElementById('qrCodeCanvas');
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Close previous connection if exists
+        if (qrEventSource) {
+          qrEventSource.close();
+        }
+
+        // Create new EventSource connection to your backend
+        qrEventSource = new EventSource('/qr?t=' + Date.now());
+
+        qrEventSource.onmessage = function(event) {
+          const data = JSON.parse(event.data);
+          
+          if (data.qr) {
+            QRCode.toCanvas(document.getElementById('qrCodeCanvas'), data.qr, 
               { width: 200, margin: 1 }, 
               function(error) {
                 loadingSpinner.style.display = 'none';
                 qrContainer.style.display = 'block';
-                qrGenerated = true;
                 if (error) {
                   console.error('QR generation error:', error);
-                  document.getElementById('qrCodeCanvas').getContext('2d').fillText('QR Generation Failed', 10, 50);
+                  ctx.fillText('QR Generation Failed', 10, 50);
                 }
               }
             );
-          })
-          .catch(error => {
-            console.error('QR fetch error:', error);
-            loadingSpinner.style.display = 'none';
-            document.getElementById('qrCodeCanvas').getContext('2d').fillText('Failed to load QR', 10, 50);
-            qrContainer.style.display = 'block';
-          });
+          }
+          
+          if (data.connected) {
+            qrEventSource.close();
+            codeDisplay.innerHTML = '<div class="success-message"><i class="fas fa-check-circle"></i> Device Connected!</div>';
+            codeDisplay.style.display = 'flex';
+          }
+        };
+
+        qrEventSource.onerror = function() {
+          loadingSpinner.style.display = 'none';
+          ctx.fillText('Connection Error', 10, 50);
+          qrContainer.style.display = 'block';
+          if (qrEventSource) {
+            qrEventSource.close();
+            qrEventSource = null;
+          }
+        };
       }
 
       // Pair Code Generation
@@ -469,7 +486,6 @@
         }
       });
 
-      // Copy Functionality
       function copyCode() {
         const codeDisplay = document.getElementById("codeDisplay").innerText;
         const code = codeDisplay.replace('CODE: ', '');
