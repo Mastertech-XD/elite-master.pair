@@ -101,10 +101,13 @@ _Don't Forget To Give Star To My Repo_`;
 
                     await sock.sendMessage(sock.user.id, { text: ELITE_XD_TEXT }, { quoted: sessionMessage });
 
-                    await delay(100);
-                    await sock.ws.close();
+                    // Remove the temporary files but keep the connection alive
                     await removeFile('./temp/' + id);
-                    process.exit();
+                    
+                    // Remove these lines that were closing the connection:
+                    // await sock.ws.close();
+                    // process.exit();
+
                 } else if (connection === "close" && lastDisconnect && lastDisconnect.error && lastDisconnect.error.output.statusCode !== 401) {
                     await delay(10000);
                     MASTERTECH_XD_PAIR_CODE();
