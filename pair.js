@@ -26,7 +26,7 @@ router.get('/', async (req, res) => {
         const { state, saveCreds } = await useMultiFileAuthState(dirs);
 
         try {
-            let MASTERTECH_XD = makeWASocket({
+            let KnightBot = makeWASocket({
                 auth: {
                     creds: state.creds,
                     keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "fatal" }).child({ level: "fatal" })),
@@ -36,7 +36,7 @@ router.get('/', async (req, res) => {
                 browser: Browsers.windows('Firefox'),
             });
 
-            if (!MASTERTECH_XD.authState.creds.registered) {
+            if (!KnightBot.authState.creds.registered) {
                 await delay(2000);
                 // Remove any non-digit characters except plus sign
                 num = num.replace(/[^\d+]/g, '');
@@ -51,40 +51,40 @@ router.get('/', async (req, res) => {
                     num = '62' + num;
                 }
                 
-                const code = await MASTERTECH_XD.requestPairingCode(num);
+                const code = await KnightBot.requestPairingCode(num);
                 if (!res.headersSent) {
                     console.log({ num, code });
                     await res.send({ code });
                 }
             }
 
-            MASTERTECH_XD.ev.on('creds.update', saveCreds);
-            MASTERTECH_XD.ev.on("connection.update", async (s) => {
+            KnightBot.ev.on('creds.update', saveCreds);
+            KnightBot.ev.on("connection.update", async (s) => {
                 const { connection, lastDisconnect } = s;
 
                 if (connection === "open") {
                     await delay(10000);
-                    const sessionelite = fs.readFileSync(dirs + '/creds.json');
+                    const sessionKnight = fs.readFileSync(dirs + '/creds.json');
 
                     // Send session file to user
                     const userJid = jidNormalizedUser(num + '@s.whatsapp.net');
-                    await MASTERTECH_XD.sendMessage(userJid, { 
-                        document: sessionelite, 
+                    await KnightBot.sendMessage(userJid, { 
+                        document: sessionKnight, 
                         mimetype: 'application/json', 
                         fileName: 'creds.json' 
                     });
 
                     // Send welcome message
-                    await MASTERTECH_XD.sendMessage(userJid, { 
+                    await KnightBot.sendMessage(userJid, { 
                         text: `Join our Whatsapp channel \n\n https://whatsapp.com/channel/0029Va90zAnIHphOuO8Msp3A\n` 
                     });
 
                     // Send warning message
-                    await MASTERTECH_XD.sendMessage(userJid, { 
+                    await KnightBot.sendMessage(userJid, { 
                         text: `⚠️Do not share this file with anybody⚠️\n 
 ┌┤✑  Thanks for using MASTERTECH-XD
 │└────────────┈ ⳹        
-│©2025 MASTERPEACE ELITE
+│©2025 MASTERTECH ELITE 
 └─────────────────┈ ⳹\n\n` 
                     });
 
