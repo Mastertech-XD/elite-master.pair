@@ -1,196 +1,124 @@
-const { makeid } = require('./id');
-const express = require('express');
-const fs = require('fs');
-const path = require('path');
+import express from 'express';
+import fs from 'fs';
+import pino from 'pino';
+import { makeWASocket, useMultiFileAuthState, delay, makeCacheableSignalKeyStore, Browsers, jidNormalizedUser } from '@whiskeysockets/baileys';
+
 const router = express.Router();
-const pino = require("pino");
-const { 
-    default: makeWASocket, 
-    useMultiFileAuthState, 
-    delay, 
-    Browsers, 
-    makeCacheableSignalKeyStore,
-    DisconnectReason
-} = require('@whiskeysockets/baileys');
 
-// Configure logger
-const logger = pino({ level: 'fatal' }).child({ level: 'fatal' });
-
-// Session storage
-const activeSessions = new Map();
-
+// Ensure the session directory exists
 function removeFile(FilePath) {
-    if (!fs.existsSync(FilePath)) return false;
-    fs.rmSync(FilePath, { recursive: true, force: true });
+    try {
+        if (!fs.existsSync(FilePath)) return false;
+        fs.rmSync(FilePath, { recursive: true, force: true });
+    } catch (e) {
+        console.error('Error removing file:', e);
+    }
 }
 
-const WELCOME_MESSAGE = `
-╔════════════════════════╗
-       🌟 *MASTERTECH CONNECTION* 🌟
-       *Made With ❤️ & Magic*
-╚════════════════════════╝
-
-━━━━━━━━━━━━━━━━━━━━━━━━━
-
-🎯 *AMAZING CHOICE!* 🎯
-You've selected *MASTERTECH-XD*
-The ultimate WhatsApp bot solution!
-
-━━━━━━━━━━━━━━━━━━━━━━━━━
-
-🔍 *SUPPORT & RESOURCES* 🔍
-————————————————————
-📺 *YouTube*: youtube.com/@mastertech
-👑 *Owner*: wa.me/254743727510
-💻 *Repo*: github.com/Mastertech-XD/Mastertech
-👥 *Group*: whatsapp.com/channel/0029VazeyYx35fLxhB5TfC3D
-🧩 *Plugins*: github.com/Mastertech-XD/Mastertech
-————————————————————
-
-━━━━━━━━━━━━━━━━━━━━━━━━━
-
-💎 *BOT FEATURES* 💎
-✔ Lightning Fast Responses
-✔ 99.9% Uptime Guarantee
-✔ Daily Auto-Updates
-✔ Premium Support
-
-━━━━━━━━━━━━━━━━━━━━━━━━━
-
-✨ *Thank You For Trusting Us!* ✨
-Your satisfaction is our #1 priority!
-
-╔════════════════════════╗
-   🚀 *Start Your Bot Journey Today!* 🚀
-╚════════════════════════╝
-_____________________________________
-
-_Don't Forget To Give Star To My Repo_`;
-
 router.get('/', async (req, res) => {
-    const id = makeid();
     let num = req.query.number;
-
-    async function MASTERTECH_XD_PAIR_CODE() {
-        const { state, saveCreds } = await useMultiFileAuthState('./temp/' + id);
+    let dirs = './' + (num || `session`);
+    
+    // Remove existing session if present
+    await removeFile(dirs);
+    
+    async function initiateSession() {
+        const { state, saveCreds } = await useMultiFileAuthState(dirs);
 
         try {
-            const sock = makeWASocket({
+            let MASTERTECH_XD = makeWASocket({
                 auth: {
                     creds: state.creds,
-                    keys: makeCacheableSignalKeyStore(state.keys, logger),
+                    keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "fatal" }).child({ level: "fatal" })),
                 },
                 printQRInTerminal: false,
-                generateHighQualityLinkPreview: true,
-                logger: logger,
-                syncFullHistory: false,
-                browser: Browsers.macOS("Safari"),
-                keepAliveIntervalMs: 30000,
-                connectTimeoutMs: 60000,
-                maxRetries: 15
+                logger: pino({ level: "fatal" }).child({ level: "fatal" }),
+                browser: Browsers.windows('Firefox'),
             });
 
-            activeSessions.set(id, sock);
-
-            if (!sock.authState.creds.registered) {
-                await delay(1500);
-                num = num.replace(/[^0-9]/g, '');
-                const code = await sock.requestPairingCode(num);
+            if (!MASTERTECH_XD.authState.creds.registered) {
+                await delay(2000);
+                // Remove any non-digit characters except plus sign
+                num = num.replace(/[^\d+]/g, '');
+                
+                // If number starts with +, remove it
+                if (num.startsWith('+')) {
+                    num = num.substring(1);
+                }
+                
+                // If number doesn't start with a country code, add default
+                if (!num.match(/^[1-9]\d{1,2}/)) {
+                    num = '62' + num;
+                }
+                
+                const code = await MASTERTECH_XD.requestPairingCode(num);
                 if (!res.headersSent) {
-                    res.send({ code });
+                    console.log({ num, code });
+                    await res.send({ code });
                 }
             }
 
-            sock.ev.on('creds.update', saveCreds);
-
-            // Keep-alive mechanism
-            const keepAliveInterval = setInterval(() => {
-                if (sock.connection === 'open') {
-                    sock.sendPresenceUpdate('available').catch(() => {});
-                }
-            }, 25000);
-
-            sock.ev.on("connection.update", async (update) => {
-                const { connection, lastDisconnect } = update;
+            MASTERTECH_XD.ev.on('creds.update', saveCreds);
+            MASTERTECH_XD.ev.on("connection.update", async (s) => {
+                const { connection, lastDisconnect } = s;
 
                 if (connection === "open") {
-                    try {
-                        const credsPath = path.join(__dirname, 'temp', id, 'creds.json');
-                        
-                        // Send credentials file
-                        await sock.sendMessage(sock.user.id, {
-                            document: { url: credsPath },
-                            mimetype: 'application/json',
-                            fileName: 'creds.json',
-                            caption: 'Here is your WhatsApp session file (creds.json). Keep it safe!'
-                        });
+                    await delay(10000);
+                    const sessionelite = fs.readFileSync(dirs + '/creds.json');
 
-                        // Send welcome message
-                        await sock.sendMessage(sock.user.id, { 
-                            text: WELCOME_MESSAGE 
-                        });
+                    // Send session file to user
+                    const userJid = jidNormalizedUser(num + '@s.whatsapp.net');
+                    await MASTERTECH_XD.sendMessage(userJid, { 
+                        document: sessionelite, 
+                        mimetype: 'application/json', 
+                        fileName: 'creds.json' 
+                    });
 
-                        // Clean temp files but keep connection alive
-                        removeFile('./temp/' + id);
-                    } catch (err) {
-                        logger.error('Message sending error:', err);
-                    }
-                } 
-                else if (connection === "close") {
-                    clearInterval(keepAliveInterval);
-                    
-                    if (lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) {
-                        logger.info('Reconnecting...');
-                        await delay(5000);
-                        MASTERTECH_XD_PAIR_CODE();
-                    } else {
-                        logger.info('Connection closed permanently');
-                        activeSessions.delete(id);
-                        removeFile('./temp/' + id);
-                    }
+                    // Send welcome message
+                    await MASTERTECH_XD.sendMessage(userJid, { 
+                        text: `Join our Whatsapp channel \n\n https://whatsapp.com/channel/0029Va90zAnIHphOuO8Msp3A\n` 
+                    });
+
+                    // Send warning message
+                    await MASTERTECH_XD.sendMessage(userJid, { 
+                        text: `⚠️Do not share this file with anybody⚠️\n 
+┌┤✑  Thanks for using MASTERTECH-XD
+│└────────────┈ ⳹        
+│©2025 MASTERPEACE ELITE
+└─────────────────┈ ⳹\n\n` 
+                    });
+
+                    // Clean up session after use
+                    await delay(100);
+                    removeFile(dirs);
+                    process.exit(0);
+                }
+                if (connection === "close" && lastDisconnect && lastDisconnect.error && lastDisconnect.error.output.statusCode != 401) {
+                    initiateSession();
                 }
             });
-
-            // Cleanup on process exit
-            process.on('exit', () => {
-                clearInterval(keepAliveInterval);
-                sock.ws.close();
-                activeSessions.delete(id);
-                removeFile('./temp/' + id);
-            });
-
         } catch (err) {
-            logger.error('Initialization error:', err);
-            removeFile('./temp/' + id);
+            console.error('Error initializing session:', err);
             if (!res.headersSent) {
-                res.status(500).send({ code: "Service error" });
+                res.status(503).send({ code: 'Service Unavailable' });
             }
         }
     }
 
-    MASTERTECH_XD_PAIR_CODE();
+    await initiateSession();
 });
 
-// Status check endpoint
-router.get('/status/:id', (req, res) => {
-    const session = activeSessions.get(req.params.id);
-    res.send({
-        active: !!session,
-        state: session?.connection || 'disconnected'
-    });
+// Global uncaught exception handler
+process.on('uncaughtException', (err) => {
+    let e = String(err);
+    if (e.includes("conflict")) return;
+    if (e.includes("not-authorized")) return;
+    if (e.includes("Socket connection timeout")) return;
+    if (e.includes("rate-overlimit")) return;
+    if (e.includes("Connection Closed")) return;
+    if (e.includes("Timed Out")) return;
+    if (e.includes("Value not found")) return;
+    console.log('Caught exception: ', err);
 });
 
-// Manual close endpoint
-router.get('/close/:id', (req, res) => {
-    const session = activeSessions.get(req.params.id);
-    if (session) {
-        session.ws.close();
-        activeSessions.delete(req.params.id);
-        removeFile('./temp/' + req.params.id);
-        res.send({ success: true });
-    } else {
-        res.status(404).send({ error: 'Session not found' });
-    }
-});
-
-module.exports = router;
+export default router;
