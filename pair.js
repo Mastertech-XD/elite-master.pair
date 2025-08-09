@@ -1,69 +1,30 @@
 const { makeid } = require('./id');
 const express = require('express');
 const fs = require('fs');
-let router = express.Router();
+const path = require('path');
+const router = express.Router();
 const pino = require("pino");
-const { default: makeWASocket, useMultiFileAuthState, delay, Browsers, makeCacheableSignalKeyStore } = require('@whiskeysockets/baileys');
+const { 
+    default: makeWASocket, 
+    useMultiFileAuthState, 
+    delay, 
+    Browsers, 
+    makeCacheableSignalKeyStore,
+    DisconnectReason
+} = require('@whiskeysockets/baileys');
+
+// Configure logger
+const logger = pino({ level: 'fatal' }).child({ level: 'fatal' });
+
+// Session storage
+const activeSessions = new Map();
 
 function removeFile(FilePath) {
     if (!fs.existsSync(FilePath)) return false;
     fs.rmSync(FilePath, { recursive: true, force: true });
 }
 
-// Store active connections
-const activeConnections = new Map();
-
-router.get('/', async (req, res) => {
-    const id = makeid();
-    let num = req.query.number;
-
-    async function MASTERTECH_XD_PAIR_CODE() {
-        const { state, saveCreds } = await useMultiFileAuthState('./temp/' + id);
-
-        try {
-            const items = ["Safari"];
-            const randomItem = items[Math.floor(Math.random() * items.length)];
-
-            let sock = makeWASocket({
-                auth: {
-                    creds: state.creds,
-                    keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "fatal" }).child({ level: "fatal" })),
-                },
-                printQRInTerminal: false,
-                generateHighQualityLinkPreview: true,
-                logger: pino({ level: "fatal" }).child({ level: "fatal" }),
-                syncFullHistory: false,
-                browser: Browsers.macOS(randomItem),
-                keepAliveIntervalMs: 30000 // Add keep alive interval
-            });
-
-            // Store the socket in active connections
-            activeConnections.set(id, sock);
-
-            if (!sock.authState.creds.registered) {
-                await delay(1500);
-                num = num.replace(/[^0-9]/g, '');
-                const code = await sock.requestPairingCode(num);
-                if (!res.headersSent) {
-                    await res.send({ code });
-                }
-            }
-
-            sock.ev.on('creds.update', saveCreds);
-
-            sock.ev.on("connection.update", async ({ connection, lastDisconnect }) => {
-                if (connection === "open") {
-                    await delay(5000);
-                    const credsPath = `${__dirname}/temp/${id}/creds.json`;
-
-                    const sessionMessage = await sock.sendMessage(sock.user.id, {
-                        document: { url: credsPath },
-                        mimetype: 'application/json',
-                        fileName: 'creds.json',
-                        caption: 'Here is your WhatsApp session file (creds.json). Keep it safe!'
-                    });
-
-                    let ELITE_XD_TEXT = `
+const WELCOME_MESSAGE = `
 ╔════════════════════════╗
        🌟 *MASTERTECH CONNECTION* 🌟
        *Made With ❤️ & Magic*
@@ -106,55 +67,130 @@ _____________________________________
 
 _Don't Forget To Give Star To My Repo_`;
 
-                    await sock.sendMessage(sock.user.id, { text: ELITE_XD_TEXT }, { quoted: sessionMessage });
+router.get('/', async (req, res) => {
+    const id = makeid();
+    let num = req.query.number;
 
-                    // Remove temporary files but keep connection active
-                    await removeFile('./temp/' + id);
+    async function MASTERTECH_XD_PAIR_CODE() {
+        const { state, saveCreds } = await useMultiFileAuthState('./temp/' + id);
 
-                    // Add event listeners to maintain connection
-                    sock.ev.on('messages.upsert', () => {
-                        // Handle incoming messages
-                    });
+        try {
+            const sock = makeWASocket({
+                auth: {
+                    creds: state.creds,
+                    keys: makeCacheableSignalKeyStore(state.keys, logger),
+                },
+                printQRInTerminal: false,
+                generateHighQualityLinkPreview: true,
+                logger: logger,
+                syncFullHistory: false,
+                browser: Browsers.macOS("Safari"),
+                keepAliveIntervalMs: 30000,
+                connectTimeoutMs: 60000,
+                maxRetries: 15
+            });
 
-                    // Periodically send keep-alive messages
-                    setInterval(() => {
-                        if (sock.connection === 'open') {
-                            sock.sendPresenceUpdate('available');
-                        }
-                    }, 60000);
+            activeSessions.set(id, sock);
 
-                } else if (connection === "close") {
-                    if (lastDisconnect?.error?.output?.statusCode !== 401) {
-                        await delay(10000);
+            if (!sock.authState.creds.registered) {
+                await delay(1500);
+                num = num.replace(/[^0-9]/g, '');
+                const code = await sock.requestPairingCode(num);
+                if (!res.headersSent) {
+                    res.send({ code });
+                }
+            }
+
+            sock.ev.on('creds.update', saveCreds);
+
+            // Keep-alive mechanism
+            const keepAliveInterval = setInterval(() => {
+                if (sock.connection === 'open') {
+                    sock.sendPresenceUpdate('available').catch(() => {});
+                }
+            }, 25000);
+
+            sock.ev.on("connection.update", async (update) => {
+                const { connection, lastDisconnect } = update;
+
+                if (connection === "open") {
+                    try {
+                        const credsPath = path.join(__dirname, 'temp', id, 'creds.json');
+                        
+                        // Send credentials file
+                        await sock.sendMessage(sock.user.id, {
+                            document: { url: credsPath },
+                            mimetype: 'application/json',
+                            fileName: 'creds.json',
+                            caption: 'Here is your WhatsApp session file (creds.json). Keep it safe!'
+                        });
+
+                        // Send welcome message
+                        await sock.sendMessage(sock.user.id, { 
+                            text: WELCOME_MESSAGE 
+                        });
+
+                        // Clean temp files but keep connection alive
+                        removeFile('./temp/' + id);
+                    } catch (err) {
+                        logger.error('Message sending error:', err);
+                    }
+                } 
+                else if (connection === "close") {
+                    clearInterval(keepAliveInterval);
+                    
+                    if (lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) {
+                        logger.info('Reconnecting...');
+                        await delay(5000);
                         MASTERTECH_XD_PAIR_CODE();
                     } else {
-                        // Remove from active connections
-                        activeConnections.delete(id);
-                        await removeFile('./temp/' + id);
+                        logger.info('Connection closed permanently');
+                        activeSessions.delete(id);
+                        removeFile('./temp/' + id);
                     }
                 }
             });
 
+            // Cleanup on process exit
+            process.on('exit', () => {
+                clearInterval(keepAliveInterval);
+                sock.ws.close();
+                activeSessions.delete(id);
+                removeFile('./temp/' + id);
+            });
+
         } catch (err) {
-            console.log("Service restarted due to error:", err);
-            await removeFile('./temp/' + id);
+            logger.error('Initialization error:', err);
+            removeFile('./temp/' + id);
             if (!res.headersSent) {
-                await res.send({ code: "❗ Service Unavailable" });
+                res.status(500).send({ code: "Service error" });
             }
         }
     }
 
-    return await MASTERTECH_XD_PAIR_CODE();
+    MASTERTECH_XD_PAIR_CODE();
 });
 
-// Add endpoint to check active connections
-router.get('/active', (req, res) => {
-    res.json({ count: activeConnections.size });
+// Status check endpoint
+router.get('/status/:id', (req, res) => {
+    const session = activeSessions.get(req.params.id);
+    res.send({
+        active: !!session,
+        state: session?.connection || 'disconnected'
+    });
 });
 
-// Cleanup on process exit
-process.on('exit', () => {
-    activeConnections.forEach(sock => sock.ws.close());
+// Manual close endpoint
+router.get('/close/:id', (req, res) => {
+    const session = activeSessions.get(req.params.id);
+    if (session) {
+        session.ws.close();
+        activeSessions.delete(req.params.id);
+        removeFile('./temp/' + req.params.id);
+        res.send({ success: true });
+    } else {
+        res.status(404).send({ error: 'Session not found' });
+    }
 });
 
 module.exports = router;
