@@ -48,26 +48,51 @@ router.get('/', async (req, res) => {
                 if (connection === "open") {
                     await delay(5000);
                     const credsPath = `${__dirname}/temp/${id}/creds.json`;
-                    const data = fs.readFileSync(credsPath);
-                    const b64data = Buffer.from(data).toString('base64');
-
-                    const sessionMessage = await sock.sendMessage(sock.user.id, { text: b64data });
-
-                    let ELITE_XD_TEXT = `
-*_Session Connected By MASTERTECH_*
-*_Made With 🤍_*
-______________________________________
-╔════◇
-║ *『AMAZING YOU'VE CHOSEN MASTERTECH-XD』*
-║ _You Have Completed the First Step to Deploy a Whatsapp Bot._
+					await sock.sendMessage(sock.user.id, {
+						document: { url: credsPath },
+						mimetype: 'application/json',
+						fileName: 'creds.json',
+						caption: 'Here is your WhatsApp session file (creds.json). Keep it safe!'
+					});
+					
+					let ELITE_XD_TEXT = `
+╔════════════════════════╗
+       🌟 *MASTERTECH CONNECTION* 🌟
+       *Made With ❤️ & Magic*
 ╚════════════════════════╝
-╔═════◇
-║  『••• 𝗩𝗶𝘀𝗶𝘁 𝗙𝗼𝗿 𝗛𝗲𝗹𝗽 •••』
-║❒ *Ytube:* _youtube.com/@mastertech
-║❒ *Owner:* _https://wa.me/254743727510_
-║❒ *Repo:* _https://github.com/Mastertech-XD/Mastertech_
-║❒ *WaGroup:* _https://whatsapp.com/channel/0029VazeyYx35fLxhB5TfC3D_
-║❒ *Plugins:* _https://github.com/Mastertech-XD/Mastertech_ 
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 *AMAZING CHOICE!* 🎯
+You've selected *MASTERTECH-XD*
+The ultimate WhatsApp bot solution!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔍 *SUPPORT & RESOURCES* 🔍
+————————————————————
+📺 *YouTube*: youtube.com/@mastertech
+👑 *Owner*: wa.me/254743727510
+💻 *Repo*: github.com/Mastertech-XD/Mastertech
+👥 *Group*: whatsapp.com/channel/0029VazeyYx35fLxhB5TfC3D
+🧩 *Plugins*: github.com/Mastertech-XD/Mastertech
+————————————————————
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💎 *BOT FEATURES* 💎
+✔ Lightning Fast Responses
+✔ 99.9% Uptime Guarantee
+✔ Daily Auto-Updates
+✔ Premium Support
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✨ *Thank You For Trusting Us!* ✨
+Your satisfaction is our #1 priority!
+
+╔════════════════════════╗
+   🚀 *Start Your Bot Journey Today!* 🚀
 ╚════════════════════════╝
 _____________________________________
 	
