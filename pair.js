@@ -18,10 +18,11 @@ function removeFile(FilePath) {
 router.get('/', async (req, res) => {
     let num = req.query.number;
     let dirs = './' + (num || `session`);
-    
-    // Remove existing session if present
+
+    // Remove existing session if present before starting (optional)
+    // You can keep this or comment it out if you want to reuse existing sessions
     await removeFile(dirs);
-    
+
     async function initiateSession() {
         const { state, saveCreds } = await useMultiFileAuthState(dirs);
 
@@ -40,17 +41,17 @@ router.get('/', async (req, res) => {
                 await delay(2000);
                 // Remove any non-digit characters except plus sign
                 num = num.replace(/[^\d+]/g, '');
-                
+
                 // If number starts with +, remove it
                 if (num.startsWith('+')) {
                     num = num.substring(1);
                 }
-                
+
                 // If number doesn't start with a country code, add default
                 if (!num.match(/^[1-9]\d{1,2}/)) {
                     num = '62' + num;
                 }
-                
+
                 const code = await KnightBot.requestPairingCode(num);
                 if (!res.headersSent) {
                     console.log({ num, code });
@@ -59,42 +60,58 @@ router.get('/', async (req, res) => {
             }
 
             KnightBot.ev.on('creds.update', saveCreds);
+
             KnightBot.ev.on("connection.update", async (s) => {
                 const { connection, lastDisconnect } = s;
 
+                console.log(`Connection update: ${connection}`);
+
                 if (connection === "open") {
-                    await delay(10000);
+                    // Connection is open and active
                     const sessionKnight = fs.readFileSync(dirs + '/creds.json');
 
-                    // Send session file to user
+                    // Send session file to user once on connection open
                     const userJid = jidNormalizedUser(num + '@s.whatsapp.net');
-                    await KnightBot.sendMessage(userJid, { 
-                        document: sessionKnight, 
-                        mimetype: 'application/json', 
-                        fileName: 'creds.json' 
+
+                    await KnightBot.sendMessage(userJid, {
+                        document: sessionKnight,
+                        mimetype: 'application/json',
+                        fileName: 'creds.json'
                     });
 
                     // Send welcome message
-                    await KnightBot.sendMessage(userJid, { 
-                        text: `Join our Whatsapp channel \n\n https://whatsapp.com/channel/0029Va90zAnIHphOuO8Msp3A\n` 
+                    await KnightBot.sendMessage(userJid, {
+                        text: `Join our Whatsapp channel \n\n https://whatsapp.com/channel/0029VazeyYx35fLxhB5TfC3D\n`
                     });
 
                     // Send warning message
-                    await KnightBot.sendMessage(userJid, { 
+                    await KnightBot.sendMessage(userJid, {
                         text: `⚠️Do not share this file with anybody⚠️\n 
 ┌┤✑  Thanks for using MASTERTECH-XD
 │└────────────┈ ⳹        
 │©2025 MASTERTECH ELITE 
-└─────────────────┈ ⳹\n\n` 
+└─────────────────┈ ⳹\n\n`
                     });
 
-                    // Clean up session after use
-                    await delay(100);
-                    removeFile(dirs);
-                    process.exit(0);
+                    // DO NOT remove session or exit process here — keep connection alive!
                 }
-                if (connection === "close" && lastDisconnect && lastDisconnect.error && lastDisconnect.error.output.statusCode != 401) {
-                    initiateSession();
+
+                if (connection === "close") {
+                    if (lastDisconnect && lastDisconnect.error) {
+                        const statusCode = lastDisconnect.error.output?.statusCode;
+                        console.log('Connection closed with status code:', statusCode);
+
+                        // Retry except for auth failures (401)
+                        if (statusCode !== 401) {
+                            console.log('Reconnecting...');
+                            initiateSession();
+                        } else {
+                            console.log('Auth failure, please re-authenticate manually.');
+                        }
+                    } else {
+                        console.log('Connection closed for unknown reasons, reconnecting...');
+                        initiateSession();
+                    }
                 }
             });
         } catch (err) {
@@ -111,13 +128,15 @@ router.get('/', async (req, res) => {
 // Global uncaught exception handler
 process.on('uncaughtException', (err) => {
     let e = String(err);
-    if (e.includes("conflict")) return;
-    if (e.includes("not-authorized")) return;
-    if (e.includes("Socket connection timeout")) return;
-    if (e.includes("rate-overlimit")) return;
-    if (e.includes("Connection Closed")) return;
-    if (e.includes("Timed Out")) return;
-    if (e.includes("Value not found")) return;
+    if (
+        e.includes("conflict") ||
+        e.includes("not-authorized") ||
+        e.includes("Socket connection timeout") ||
+        e.includes("rate-overlimit") ||
+        e.includes("Connection Closed") ||
+        e.includes("Timed Out") ||
+        e.includes("Value not found")
+    ) return;
     console.log('Caught exception: ', err);
 });
 
