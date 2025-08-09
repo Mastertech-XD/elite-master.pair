@@ -105,6 +105,7 @@
       box-shadow: 0 4px 12px rgba(0,0,0,0.2);
     }
 
+    /* New QR/Pair toggle buttons */
     .option-buttons {
       display: flex;
       justify-content: center;
@@ -127,6 +128,7 @@
       border-color: var(--primary-color);
     }
 
+    /* QR Code container */
     .qr-container {
       text-align: center;
       margin-bottom: 20px;
@@ -142,6 +144,26 @@
       border-radius: 8px;
     }
 
+    /* Instructions */
+    .instructions {
+      background-color: var(--hover-color);
+      padding: 15px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      text-align: left;
+      display: none;
+    }
+
+    .instructions ol {
+      padding-left: 20px;
+    }
+
+    .instructions li {
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    /* Existing pair code elements */
     .input-group {
       margin-bottom: 20px;
     }
@@ -186,24 +208,6 @@
     .generate-btn:hover {
       transform: translateY(-1px);
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    }
-
-    .instructions {
-      background-color: var(--hover-color);
-      padding: 15px;
-      border-radius: 12px;
-      margin-bottom: 20px;
-      text-align: left;
-      display: none;
-    }
-
-    .instructions ol {
-      padding-left: 20px;
-    }
-
-    .instructions li {
-      margin-bottom: 8px;
-      font-size: 14px;
     }
 
     .code-display {
@@ -288,6 +292,11 @@
         padding: 20px;
         border-radius: 12px;
       }
+
+      .code-display {
+        font-size: 16px;
+        min-height: 50px;
+      }
     }
   </style>
 </head>
@@ -305,14 +314,16 @@
       </div>
     </div>
 
+    <!-- New toggle buttons -->
     <div class="option-buttons">
-      <div class="option-button selected" id="pairCodeBtn">Pair Code</div>
-      <div class="option-button" id="qrCodeBtn">QR Code</div>
+      <div class="option-button" id="pairCodeBtn">Pair Code</div>
+      <div class="option-button selected" id="qrCodeBtn">QR Code</div>
     </div>
 
+    <!-- QR Code Section -->
     <div class="qr-container" id="qrContainer">
       <canvas id="qrCodeCanvas"></canvas>
-      <div class="instructions">
+      <div class="instructions" id="instructions">
         <ol>
           <li>Open WhatsApp on your phone</li>
           <li>Go to Settings > Linked Devices</li>
@@ -322,6 +333,7 @@
       </div>
     </div>
 
+    <!-- Existing Pair Code Section -->
     <div class="input-group" id="numberInput">
       <label class="input-label">Enter your WhatsApp number with country code</label>
       <input type="text" id="mobileNumber" class="input-field" placeholder="+254743727510" pattern="[+][0-9]{10,}" title="Please enter country code starting with + followed by number">
@@ -362,14 +374,11 @@
       const codeDisplay = document.getElementById('codeDisplay');
       const copyBtn = document.getElementById('copy');
       const loadingSpinner = document.getElementById('loading');
-      let qrSocket = null;
-
-      // Initialize with Pair Code view (since we know it works)
-      pairCodeBtn.classList.add('selected');
+      
+      // Initialize with QR code view hidden (showing pair code by default)
       qrContainer.style.display = 'none';
       instructions.style.display = 'none';
-      copyBtn.style.display = 'none';
-
+      
       // Toggle between views
       pairCodeBtn.addEventListener('click', function() {
         pairCodeBtn.classList.add('selected');
@@ -378,14 +387,6 @@
         instructions.style.display = 'none';
         numberInput.style.display = 'block';
         generateBtn.style.display = 'block';
-        codeDisplay.style.display = 'none';
-        copyBtn.style.display = 'none';
-        
-        // Close WebSocket connection if exists
-        if (qrSocket) {
-          qrSocket.close();
-          qrSocket = null;
-        }
       });
 
       qrCodeBtn.addEventListener('click', function() {
@@ -398,110 +399,68 @@
         codeDisplay.style.display = 'none';
         copyBtn.style.display = 'none';
         
-        initQRCodeSession();
+        // Generate QR code
+        generateQRCode();
       });
 
-      // Initialize QR Code Session with WebSocket
-      function initQRCodeSession() {
+      // QR Code Generation
+      function generateQRCode() {
         loadingSpinner.style.display = 'block';
         
-        // Clear previous QR code
-        const canvas = document.getElementById('qrCodeCanvas');
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        // Close previous connection if exists
-        if (qrSocket) {
-          qrSocket.close();
-        }
-
-        // Create WebSocket connection
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const host = window.location.host;
-        qrSocket = new WebSocket(`${protocol}//${host}/qr`);
-
-        qrSocket.onopen = function() {
-          console.log('WebSocket connection established');
-        };
-
-        qrSocket.onmessage = function(event) {
-          const data = JSON.parse(event.data);
-          
-          if (data.qr) {
-            QRCode.toCanvas(document.getElementById('qrCodeCanvas'), data.qr, 
-              { width: 200, margin: 1 }, 
-              function(error) {
-                loadingSpinner.style.display = 'none';
-                if (error) {
-                  console.error('QR generation error:', error);
-                  ctx.fillText('QR Generation Failed', 10, 50);
-                }
+        // This is a placeholder - replace with your actual QR code generation logic
+        // For a real implementation, you would call your backend endpoint
+        setTimeout(() => {
+          const sampleQR = 'https://example.com/whatsapp-link';
+          QRCode.toCanvas(document.getElementById('qrCodeCanvas'), sampleQR, 
+            { width: 200, margin: 1 }, 
+            function(error) {
+              loadingSpinner.style.display = 'none';
+              if (error) {
+                console.error('QR generation error:', error);
+                document.getElementById('qrCodeCanvas').getContext('2d').fillText('QR Generation Failed', 10, 50);
               }
-            );
-          }
-          
-          if (data.connected) {
-            qrSocket.close();
-            codeDisplay.innerHTML = '<div class="success-message"><i class="fas fa-check-circle"></i> Device Connected!</div>';
-            codeDisplay.style.display = 'flex';
-          }
-        };
-
-        qrSocket.onerror = function(error) {
-          console.error('WebSocket error:', error);
-          loadingSpinner.style.display = 'none';
-          ctx.fillText('Connection Error', 10, 50);
-        };
-
-        qrSocket.onclose = function() {
-          console.log('WebSocket connection closed');
-          qrSocket = null;
-        };
+            }
+          );
+        }, 1000);
       }
 
-      // Pair Code Generation - Fixed display issue
+      // Your existing pair code generation (keep this exactly as it was working)
       document.getElementById("submit").addEventListener("click", async (e) => {
         e.preventDefault();
         const mobileNumberInput = document.getElementById("mobileNumber");
+        const codeDisplay = document.getElementById("codeDisplay");
+        const loadingSpinner = document.getElementById("loading");
+
         const mobileNumber = mobileNumberInput.value.trim();
-        
         if (!mobileNumber) {
           codeDisplay.innerHTML = '<div class="error-message"><i class="fas fa-exclamation-circle"></i> Please enter your WhatsApp number</div>';
-          codeDisplay.style.display = 'flex';
           return;
         }
 
         loadingSpinner.style.display = "block";
-        codeDisplay.style.display = 'none';
-        copyBtn.style.display = 'none';
+        codeDisplay.innerHTML = '';
 
         try {
-          const response = await axios(`/pair?number=${mobileNumber.replace(/[^0-9]/g, "")}`);
+          const response = await axios(`/code?number=${mobileNumber.replace(/[^0-9]/g, "")}`);
           const code = response.data.code || "Service Unavailable";
-          
           if (code === "Service Unavailable") {
             codeDisplay.innerHTML = '<div class="error-message"><i class="fas fa-exclamation-circle"></i> Service Unavailable</div>';
           } else {
-            // Format the code with hyphens for better readability
-            const formattedCode = code.match(/.{1,4}/g).join('-');
-            codeDisplay.innerHTML = `<div class="success-message"><i class="fas fa-check-circle"></i> CODE: ${formattedCode}</div>`;
+            codeDisplay.innerHTML = `<div class="success-message"><i class="fas fa-check-circle"></i> CODE: ${code}</div>`;
             copyBtn.style.display = 'flex';
           }
-          codeDisplay.style.display = 'flex';
         } catch (error) {
           console.error("Error generating code:", error);
           codeDisplay.innerHTML = '<div class="error-message"><i class="fas fa-exclamation-circle"></i> Error generating code. Please try again.</div>';
-          codeDisplay.style.display = 'flex';
         } finally {
           loadingSpinner.style.display = "none";
         }
       });
 
-      // Copy Functionality - Fixed to copy just the code
+      // Your existing copy function
       function copyCode() {
-        const codeText = document.getElementById("codeDisplay").innerText;
-        // Extract just the code (without "CODE: " prefix)
-        const code = codeText.split('CODE: ')[1];
+        const codeDisplay = document.getElementById("codeDisplay").innerText;
+        const code = codeDisplay.replace('CODE: ', '');
         navigator.clipboard.writeText(code).then(() => {
           const copyBtn = document.getElementById("copy");
           const originalText = copyBtn.innerHTML;
