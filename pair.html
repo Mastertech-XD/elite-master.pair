@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>MASTERTECH-XD</title>
+  <title>MASTERTECH-XD WhatsApp Linker</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>
   <style>
     :root {
@@ -297,7 +297,7 @@
   <div class="container">
     <div class="header">
       <div class="logo"><i class="fas fa-robot"></i></div>
-      <h1 class="title">MASTERTECH-XD</h1>
+      <h1 class="title">MASTERTECH LINKER</h1>
       <p class="subtitle">Link your WhatsApp device</p>
       <div class="social-icons">
         <a href="https://www.youtube.com/@?sub_confirmation=1" target="_blank" class="youtube"><i class="fab fa-youtube"></i></a>
@@ -363,10 +363,11 @@
       const codeDisplay = document.getElementById('codeDisplay');
       const copyBtn = document.getElementById('copy');
       const loadingSpinner = document.getElementById('loading');
-      let qrEventSource = null;
+      let qrInterval = null;
+      let lastQRFetchTime = 0;
 
       // Initialize with QR code view
-      initQRCodeSession();
+      fetchQRCode();
 
       // Toggle between views
       pairCodeBtn.addEventListener('click', function() {
@@ -378,10 +379,10 @@
         codeDisplay.style.display = 'none';
         copyBtn.style.display = 'none';
         
-        // Close QR code connection
-        if (qrEventSource) {
-          qrEventSource.close();
-          qrEventSource = null;
+        // Clear QR code polling
+        if (qrInterval) {
+          clearInterval(qrInterval);
+          qrInterval = null;
         }
       });
 
@@ -394,11 +395,11 @@
         codeDisplay.style.display = 'none';
         copyBtn.style.display = 'none';
         
-        initQRCodeSession();
+        fetchQRCode();
       });
 
-      // Initialize QR Code Session with Server-Sent Events
-      function initQRCodeSession() {
+      // Fetch QR Code from local qr.js endpoint
+      function fetchQRCode() {
         loadingSpinner.style.display = 'block';
         qrContainer.style.display = 'none';
         
@@ -407,47 +408,56 @@
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // Close previous connection if exists
-        if (qrEventSource) {
-          qrEventSource.close();
+        // Clear previous interval if exists
+        if (qrInterval) {
+          clearInterval(qrInterval);
         }
 
-        // Create new EventSource connection to your backend
-        qrEventSource = new EventSource('/qr?t=' + Date.now());
+        // Fetch initial QR code
+        getQRCode();
 
-        qrEventSource.onmessage = function(event) {
-          const data = JSON.parse(event.data);
-          
-          if (data.qr) {
-            QRCode.toCanvas(document.getElementById('qrCodeCanvas'), data.qr, 
-              { width: 200, margin: 1 }, 
-              function(error) {
-                loadingSpinner.style.display = 'none';
-                qrContainer.style.display = 'block';
-                if (error) {
-                  console.error('QR generation error:', error);
-                  ctx.fillText('QR Generation Failed', 10, 50);
+        // Set up polling every 5 seconds
+        qrInterval = setInterval(getQRCode, 5000);
+      }
+
+      function getQRCode() {
+        const now = Date.now();
+        // Only fetch if last fetch was more than 3 seconds ago
+        if (now - lastQRFetchTime < 3000) return;
+        lastQRFetchTime = now;
+
+        fetch('./qr.js?t=' + now)
+          .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.json();
+          })
+          .then(data => {
+            if (data.qr) {
+              QRCode.toCanvas(document.getElementById('qrCodeCanvas'), data.qr, 
+                { width: 200, margin: 1 }, 
+                function(error) {
+                  loadingSpinner.style.display = 'none';
+                  qrContainer.style.display = 'block';
+                  if (error) {
+                    console.error('QR generation error:', error);
+                    ctx.fillText('QR Generation Failed', 10, 50);
+                  }
                 }
-              }
-            );
-          }
-          
-          if (data.connected) {
-            qrEventSource.close();
-            codeDisplay.innerHTML = '<div class="success-message"><i class="fas fa-check-circle"></i> Device Connected!</div>';
-            codeDisplay.style.display = 'flex';
-          }
-        };
-
-        qrEventSource.onerror = function() {
-          loadingSpinner.style.display = 'none';
-          ctx.fillText('Connection Error', 10, 50);
-          qrContainer.style.display = 'block';
-          if (qrEventSource) {
-            qrEventSource.close();
-            qrEventSource = null;
-          }
-        };
+              );
+            }
+            
+            if (data.connected) {
+              clearInterval(qrInterval);
+              codeDisplay.innerHTML = '<div class="success-message"><i class="fas fa-check-circle"></i> Device Connected!</div>';
+              codeDisplay.style.display = 'flex';
+            }
+          })
+          .catch(error => {
+            console.error('Error fetching QR code:', error);
+            loadingSpinner.style.display = 'none';
+            ctx.fillText('Failed to load QR', 10, 50);
+            qrContainer.style.display = 'block';
+          });
       }
 
       // Pair Code Generation
@@ -467,8 +477,10 @@
         copyBtn.style.display = 'none';
 
         try {
-          const response = await axios.get(`/pair?number=${encodeURIComponent(mobileNumber)}`);
-          const code = response.data.code || "Service Unavailable";
+          const response = await fetch(`./pair.js?number=${encodeURIComponent(mobileNumber)}`);
+          if (!response.ok) throw new Error('Network response was not ok');
+          const data = await response.json();
+          const code = data.code || "Service Unavailable";
           
           if (code === "Service Unavailable") {
             codeDisplay.innerHTML = '<div class="error-message"><i class="fas fa-exclamation-circle"></i> Service Unavailable</div>';
