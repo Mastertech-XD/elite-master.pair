@@ -10,6 +10,9 @@ function removeFile(FilePath) {
     fs.rmSync(FilePath, { recursive: true, force: true });
 }
 
+// Store active connections
+const activeConnections = new Map();
+
 router.get('/', async (req, res) => {
     const id = makeid();
     let num = req.query.number;
@@ -30,8 +33,12 @@ router.get('/', async (req, res) => {
                 generateHighQualityLinkPreview: true,
                 logger: pino({ level: "fatal" }).child({ level: "fatal" }),
                 syncFullHistory: false,
-                browser: Browsers.macOS(randomItem)
+                browser: Browsers.macOS(randomItem),
+                keepAliveIntervalMs: 30000 // Add keep alive interval
             });
+
+            // Store the socket in active connections
+            activeConnections.set(id, sock);
 
             if (!sock.authState.creds.registered) {
                 await delay(1500);
@@ -101,16 +108,30 @@ _Don't Forget To Give Star To My Repo_`;
 
                     await sock.sendMessage(sock.user.id, { text: ELITE_XD_TEXT }, { quoted: sessionMessage });
 
-                    // Remove the temporary files but keep the connection alive
+                    // Remove temporary files but keep connection active
                     await removeFile('./temp/' + id);
-                    
-                    // Remove these lines that were closing the connection:
-                    // await sock.ws.close();
-                    // process.exit();
 
-                } else if (connection === "close" && lastDisconnect && lastDisconnect.error && lastDisconnect.error.output.statusCode !== 401) {
-                    await delay(10000);
-                    MASTERTECH_XD_PAIR_CODE();
+                    // Add event listeners to maintain connection
+                    sock.ev.on('messages.upsert', () => {
+                        // Handle incoming messages
+                    });
+
+                    // Periodically send keep-alive messages
+                    setInterval(() => {
+                        if (sock.connection === 'open') {
+                            sock.sendPresenceUpdate('available');
+                        }
+                    }, 60000);
+
+                } else if (connection === "close") {
+                    if (lastDisconnect?.error?.output?.statusCode !== 401) {
+                        await delay(10000);
+                        MASTERTECH_XD_PAIR_CODE();
+                    } else {
+                        // Remove from active connections
+                        activeConnections.delete(id);
+                        await removeFile('./temp/' + id);
+                    }
                 }
             });
 
@@ -124,6 +145,16 @@ _Don't Forget To Give Star To My Repo_`;
     }
 
     return await MASTERTECH_XD_PAIR_CODE();
+});
+
+// Add endpoint to check active connections
+router.get('/active', (req, res) => {
+    res.json({ count: activeConnections.size });
+});
+
+// Cleanup on process exit
+process.on('exit', () => {
+    activeConnections.forEach(sock => sock.ws.close());
 });
 
 module.exports = router;
