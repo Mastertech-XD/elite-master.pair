@@ -6,138 +6,232 @@ import {
     useMultiFileAuthState, 
     delay, 
     makeCacheableSignalKeyStore, 
-    Browsers, 
-    jidNormalizedUser 
+    Browsers,
+    DisconnectReason
 } from '@whiskeysockets/baileys';
+import { Boom } from '@hapi/boom';
 
 const router = express.Router();
 
-// Helper to remove files/folders
-function removeFile(FilePath) {
+// Session management
+const sessionMap = new Map(); // Track active sessions
+
+// Improved file handling
+async function removeSessionFiles(dir) {
     try {
-        if (!fs.existsSync(FilePath)) return false;
-        fs.rmSync(FilePath, { recursive: true, force: true });
+        if (!fs.existsSync(dir)) return;
+        await fs.promises.rm(dir, { recursive: true, force: true });
     } catch (e) {
-        console.error('Error removing file:', e);
+        console.error('Error removing session files:', e);
     }
 }
 
-router.get('/', async (req, res) => {
-    let num = req.query.number;
-    let dirs = './' + (num || `session`);
-    let welcomeSent = false; // track if we've already sent file & messages
+// Connection handler with proper cleanup
+async function createConnection(num, res) {
+    const sessionDir = `./sessions/${num}`;
+    let sock;
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 5;
 
-    // Optional: remove old session folder before starting
-    await removeFile(dirs);
+    try {
+        // Clean previous session if exists
+        await removeSessionFiles(sessionDir);
 
-    async function initiateSession() {
-        const { state, saveCreds } = await useMultiFileAuthState(dirs);
+        // Initialize new session
+        const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
+        
+        sock = makeWASocket({
+            auth: {
+                creds: state.creds,
+                keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' })),
+            },
+            printQRInTerminal: false,
+            logger: pino({ level: 'silent' }),
+            browser: Browsers.ubuntu('Chrome'),
+            markOnlineOnConnect: false, // Better for server deployment
+            syncFullHistory: false,
+            shouldIgnoreJid: jid => jid.endsWith('@g.us'), // Ignore group messages if needed
+            getMessage: async () => null, // Minimal message storage
+        });
 
+        // Store the active connection
+        sessionMap.set(num, sock);
+
+        // Handle credentials update
+        sock.ev.on('creds.update', saveCreds);
+
+        // Connection state handler
+        sock.ev.on('connection.update', async (update) => {
+            const { connection, lastDisconnect, qr } = update;
+
+            if (qr) {
+                // Handle QR code generation if needed
+                console.log('QR generated for', num);
+            }
+
+            if (connection === 'open') {
+                reconnectAttempts = 0; // Reset on successful connection
+                console.log(`Connected successfully: ${num}`);
+                
+                // Send session files and welcome messages
+                await sendInitialMessages(sock, num, sessionDir);
+            }
+
+            if (connection === 'close') {
+                const shouldReconnect = handleDisconnection(lastDisconnect);
+                if (shouldReconnect && reconnectAttempts < maxReconnectAttempts) {
+                    reconnectAttempts++;
+                    console.log(`Reconnecting attempt ${reconnectAttempts}/${maxReconnectAttempts}...`);
+                    await delay(5000);
+                    await createConnection(num, res);
+                } else {
+                    console.log(`Max reconnection attempts reached for ${num}`);
+                    cleanupConnection(num);
+                }
+            }
+        });
+
+        // Handle pairing if needed
+        if (!state.creds.registered) {
+            await handlePairing(sock, num, res);
+        }
+
+        return sock;
+
+    } catch (error) {
+        console.error('Connection error:', error);
+        cleanupConnection(num);
+        throw error;
+    }
+}
+
+// Improved disconnection handler
+function handleDisconnection(lastDisconnect) {
+    if (!lastDisconnect?.error) return true;
+
+    const statusCode = (lastDisconnect.error instanceof Boom) 
+        ? lastDisconnect.error.output?.statusCode 
+        : lastDisconnect.error.code;
+
+    console.log('Disconnection reason:', statusCode || lastDisconnect.error);
+
+    // Don't reconnect on these status codes
+    const unrecoverableCodes = [
+        DisconnectReason.loggedOut,
+        DisconnectReason.badSession,
+        DisconnectReason.restartRequired,
+        DisconnectReason.multideviceMismatch
+    ];
+
+    return !unrecoverableCodes.includes(statusCode);
+}
+
+// Cleanup connection properly
+function cleanupConnection(num) {
+    const sock = sessionMap.get(num);
+    if (sock) {
         try {
-            let KnightBot = makeWASocket({
-                auth: {
-                    creds: state.creds,
-                    keys: makeCacheableSignalKeyStore(
-                        state.keys, 
-                        pino({ level: "fatal" }).child({ level: "fatal" })
-                    ),
-                },
-                printQRInTerminal: false,
-                logger: pino({ level: "fatal" }).child({ level: "fatal" }),
-                browser: Browsers.windows('Firefox'),
+            sock.end();
+            sock.ws.close();
+        } catch (e) {
+            console.error('Error cleaning up connection:', e);
+        }
+        sessionMap.delete(num);
+    }
+}
+
+// Handle pairing process
+async function handlePairing(sock, num, res) {
+    try {
+        const cleanNum = num.replace(/[^\d]/g, '');
+        const code = await sock.requestPairingCode(cleanNum);
+        
+        if (!res.headersSent) {
+            res.json({ 
+                status: 'pairing',
+                number: cleanNum,
+                code: code.match(/.{1,4}/g)?.join('-') || code,
+                instructions: 'Enter this code in WhatsApp: Settings → Linked Devices → Link a Device'
             });
+        }
+    } catch (error) {
+        console.error('Pairing failed:', error);
+        if (!res.headersSent) {
+            res.status(500).json({ error: 'Pairing failed', details: error.message });
+        }
+        throw error;
+    }
+}
 
-            if (!KnightBot.authState.creds.registered) {
-                await delay(2000);
+// Send initial messages and files
+async function sendInitialMessages(sock, num, sessionDir) {
+    try {
+        const userJid = `${num}@s.whatsapp.net`;
+        
+        // Send session files
+        const creds = await fs.promises.readFile(`${sessionDir}/creds.json`);
+        await sock.sendMessage(userJid, {
+            document: creds,
+            mimetype: 'application/json',
+            fileName: 'creds.json'
+        });
 
-                num = num.replace(/[^\d+]/g, '');
-                if (num.startsWith('+')) num = num.substring(1);
-                if (!num.match(/^[1-9]\d{1,2}/)) num = '62' + num;
+        // Send welcome messages
+        await sock.sendMessage(userJid, {
+            text: '🚀 *Bot Connected Successfully!*\n\n' +
+                  '▸ *Session files* have been sent\n' +
+                  '▸ Keep them secure!\n\n' +
+                  'Join our channel for updates:\n' +
+                  'https://whatsapp.com/channel/0029VazeyYx35fLxhB5TfC3D'
+        });
 
-                const code = await KnightBot.requestPairingCode(num);
-                if (!res.headersSent) {
-                    console.log({ num, code });
-                    await res.send({ code });
-                }
-            }
+    } catch (error) {
+        console.error('Error sending initial messages:', error);
+    }
+}
 
-            KnightBot.ev.on('creds.update', saveCreds);
+// API endpoint
+router.get('/', async (req, res) => {
+    try {
+        const { number } = req.query;
+        
+        if (!number) {
+            return res.status(400).json({ error: 'Number parameter is required' });
+        }
 
-            KnightBot.ev.on("connection.update", async (s) => {
-                const { connection, lastDisconnect } = s;
+        // Validate number format
+        const cleanNum = number.replace(/[^\d]/g, '');
+        if (cleanNum.length < 10) {
+            return res.status(400).json({ error: 'Invalid number format' });
+        }
 
-                console.log(`Connection update: ${connection}`);
-
-                if (connection === "open" && !welcomeSent) {
-                    welcomeSent = true; // ensure messages/files only sent once
-
-                    try {
-                        const sessionKnight = fs.readFileSync(dirs + '/creds.json');
-                        const userJid = jidNormalizedUser(num + '@s.whatsapp.net');
-
-                        // Send session file once
-                        await KnightBot.sendMessage(userJid, {
-                            document: sessionKnight,
-                            mimetype: 'application/json',
-                            fileName: 'creds.json'
-                        });
-
-                        // Send welcome & warning messages
-                        await KnightBot.sendMessage(userJid, {
-                            text: `Join our Whatsapp channel \n\n https://whatsapp.com/channel/0029VazeyYx35fLxhB5TfC3D\n`
-                        });
-
-                        await KnightBot.sendMessage(userJid, {
-                            text: `⚠️ Do not share this file with anybody ⚠️\n 
-┌┤✑  Thanks for using MASTERTECH-XD
-│└────────────┈ ⳹        
-│©2025 MASTERTECH ELITE 
-└─────────────────┈ ⳹\n\n`
-                        });
-
-                    } catch (err) {
-                        console.error('Error sending initial file/messages:', err);
-                    }
-                }
-
-                if (connection === "close") {
-                    const shouldReconnect = 
-                        lastDisconnect && lastDisconnect.error && 
-                        lastDisconnect.error.output?.statusCode !== 401;
-
-                    if (shouldReconnect) {
-                        console.log('Connection closed. Reconnecting...');
-                        initiateSession();
-                    } else {
-                        console.log('Authentication failure or intentional logout.');
-                    }
-                }
+        // Check for existing connection
+        if (sessionMap.has(cleanNum)) {
+            return res.json({ 
+                status: 'already_connected',
+                number: cleanNum,
+                message: 'Session already exists for this number'
             });
+        }
 
-        } catch (err) {
-            console.error('Error initializing session:', err);
-            if (!res.headersSent) {
-                res.status(503).send({ code: 'Service Unavailable' });
-            }
+        // Create new connection
+        await createConnection(cleanNum, res);
+
+    } catch (error) {
+        console.error('Endpoint error:', error);
+        if (!res.headersSent) {
+            res.status(500).json({ 
+                error: 'Connection failed',
+                details: error.message 
+            });
         }
     }
-
-    await initiateSession();
 });
 
-// Handle unexpected errors gracefully
-process.on('uncaughtException', (err) => {
-    let e = String(err);
-    if (
-        e.includes("conflict") ||
-        e.includes("not-authorized") ||
-        e.includes("Socket connection timeout") ||
-        e.includes("rate-overlimit") ||
-        e.includes("Connection Closed") ||
-        e.includes("Timed Out") ||
-        e.includes("Value not found")
-    ) return;
-    console.log('Caught exception: ', err);
+// Error handling middleware
+router.use((err, req, res, next) => {
+    console.error('Unhandled error:', err);
+    res.status(500).json({ error: 'Internal server error' });
 });
 
 export default router;
