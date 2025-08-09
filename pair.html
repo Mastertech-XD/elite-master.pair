@@ -144,7 +144,6 @@
 
     .input-group {
       margin-bottom: 20px;
-      display: none;
     }
 
     .input-label {
@@ -182,7 +181,6 @@
       cursor: pointer;
       transition: all 0.3s ease;
       margin-bottom: 16px;
-      display: none;
     }
 
     .generate-btn:hover {
@@ -196,6 +194,7 @@
       border-radius: 12px;
       margin-bottom: 20px;
       text-align: left;
+      display: none;
     }
 
     .instructions ol {
@@ -220,7 +219,6 @@
       align-items: center;
       justify-content: center;
       border: 1.5px solid var(--border-color);
-      display: none;
     }
 
     .copy-btn {
@@ -236,7 +234,6 @@
       align-items: center;
       justify-content: center;
       gap: 8px;
-      display: none;
     }
 
     .copy-btn:hover {
@@ -309,8 +306,8 @@
     </div>
 
     <div class="option-buttons">
-      <div class="option-button" id="pairCodeBtn">Pair Code</div>
-      <div class="option-button selected" id="qrCodeBtn">QR Code</div>
+      <div class="option-button selected" id="pairCodeBtn">Pair Code</div>
+      <div class="option-button" id="qrCodeBtn">QR Code</div>
     </div>
 
     <div class="qr-container" id="qrContainer">
@@ -359,6 +356,7 @@
       const pairCodeBtn = document.getElementById('pairCodeBtn');
       const qrCodeBtn = document.getElementById('qrCodeBtn');
       const qrContainer = document.getElementById('qrContainer');
+      const instructions = document.getElementById('instructions');
       const numberInput = document.getElementById('numberInput');
       const generateBtn = document.getElementById('submit');
       const codeDisplay = document.getElementById('codeDisplay');
@@ -366,20 +364,24 @@
       const loadingSpinner = document.getElementById('loading');
       let qrSocket = null;
 
-      // Initialize with QR code view
-      initQRCodeSession();
+      // Initialize with Pair Code view (since we know it works)
+      pairCodeBtn.classList.add('selected');
+      qrContainer.style.display = 'none';
+      instructions.style.display = 'none';
+      copyBtn.style.display = 'none';
 
       // Toggle between views
       pairCodeBtn.addEventListener('click', function() {
         pairCodeBtn.classList.add('selected');
         qrCodeBtn.classList.remove('selected');
         qrContainer.style.display = 'none';
+        instructions.style.display = 'none';
         numberInput.style.display = 'block';
         generateBtn.style.display = 'block';
         codeDisplay.style.display = 'none';
         copyBtn.style.display = 'none';
         
-        // Close WebSocket connection
+        // Close WebSocket connection if exists
         if (qrSocket) {
           qrSocket.close();
           qrSocket = null;
@@ -390,6 +392,7 @@
         qrCodeBtn.classList.add('selected');
         pairCodeBtn.classList.remove('selected');
         qrContainer.style.display = 'block';
+        instructions.style.display = 'block';
         numberInput.style.display = 'none';
         generateBtn.style.display = 'none';
         codeDisplay.style.display = 'none';
@@ -401,7 +404,6 @@
       // Initialize QR Code Session with WebSocket
       function initQRCodeSession() {
         loadingSpinner.style.display = 'block';
-        qrContainer.style.display = 'none';
         
         // Clear previous QR code
         const canvas = document.getElementById('qrCodeCanvas');
@@ -413,7 +415,7 @@
           qrSocket.close();
         }
 
-        // Create WebSocket connection (adjust protocol based on your deployment)
+        // Create WebSocket connection
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const host = window.location.host;
         qrSocket = new WebSocket(`${protocol}//${host}/qr`);
@@ -430,7 +432,6 @@
               { width: 200, margin: 1 }, 
               function(error) {
                 loadingSpinner.style.display = 'none';
-                qrContainer.style.display = 'block';
                 if (error) {
                   console.error('QR generation error:', error);
                   ctx.fillText('QR Generation Failed', 10, 50);
@@ -450,7 +451,6 @@
           console.error('WebSocket error:', error);
           loadingSpinner.style.display = 'none';
           ctx.fillText('Connection Error', 10, 50);
-          qrContainer.style.display = 'block';
         };
 
         qrSocket.onclose = function() {
@@ -459,7 +459,7 @@
         };
       }
 
-      // Pair Code Generation - Fixed to properly display the code
+      // Pair Code Generation - Fixed display issue
       document.getElementById("submit").addEventListener("click", async (e) => {
         e.preventDefault();
         const mobileNumberInput = document.getElementById("mobileNumber");
@@ -476,18 +476,14 @@
         copyBtn.style.display = 'none';
 
         try {
-          // Use the correct endpoint from your pair.js
-          const response = await fetch(`/pair?number=${encodeURIComponent(mobileNumber)}`);
-          if (!response.ok) throw new Error('Network response was not ok');
-          
-          const data = await response.json();
-          const code = data.code || "Service Unavailable";
+          const response = await axios(`/pair?number=${mobileNumber.replace(/[^0-9]/g, "")}`);
+          const code = response.data.code || "Service Unavailable";
           
           if (code === "Service Unavailable") {
             codeDisplay.innerHTML = '<div class="error-message"><i class="fas fa-exclamation-circle"></i> Service Unavailable</div>';
           } else {
-            // Display the code properly formatted
-            const formattedCode = code.match(/.{1,4}/g).join('-'); // Add hyphens every 4 characters
+            // Format the code with hyphens for better readability
+            const formattedCode = code.match(/.{1,4}/g).join('-');
             codeDisplay.innerHTML = `<div class="success-message"><i class="fas fa-check-circle"></i> CODE: ${formattedCode}</div>`;
             copyBtn.style.display = 'flex';
           }
@@ -501,10 +497,11 @@
         }
       });
 
+      // Copy Functionality - Fixed to copy just the code
       function copyCode() {
-        const codeDisplay = document.getElementById("codeDisplay").innerText;
-        // Extract just the code without "CODE: " prefix
-        const code = codeDisplay.match(/CODE: ([\d-]+)/)[1];
+        const codeText = document.getElementById("codeDisplay").innerText;
+        // Extract just the code (without "CODE: " prefix)
+        const code = codeText.split('CODE: ')[1];
         navigator.clipboard.writeText(code).then(() => {
           const copyBtn = document.getElementById("copy");
           const originalText = copyBtn.innerHTML;
