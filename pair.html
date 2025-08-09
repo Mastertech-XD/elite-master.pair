@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>MASTERTECH-XD WhatsApp Linker</title>
+  <title>Mastertech-xd Bot - Pair Code Generator</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>
   <style>
     :root {
@@ -105,65 +105,6 @@
       box-shadow: 0 4px 12px rgba(0,0,0,0.2);
     }
 
-    /* New QR/Pair toggle buttons */
-    .option-buttons {
-      display: flex;
-      justify-content: center;
-      gap: 10px;
-      margin-bottom: 20px;
-    }
-
-    .option-button {
-      padding: 8px 16px;
-      border: 1px solid var(--border-color);
-      border-radius: 4px;
-      cursor: pointer;
-      font-weight: 500;
-      transition: all 0.2s ease;
-    }
-
-    .option-button.selected {
-      background-color: var(--primary-color);
-      color: var(--secondary-color);
-      border-color: var(--primary-color);
-    }
-
-    /* QR Code container */
-    .qr-container {
-      text-align: center;
-      margin-bottom: 20px;
-      display: none;
-    }
-
-    #qrCodeCanvas {
-      width: 200px;
-      height: 200px;
-      margin: 0 auto;
-      background: white;
-      padding: 10px;
-      border-radius: 8px;
-    }
-
-    /* Instructions */
-    .instructions {
-      background-color: var(--hover-color);
-      padding: 15px;
-      border-radius: 12px;
-      margin-bottom: 20px;
-      text-align: left;
-      display: none;
-    }
-
-    .instructions ol {
-      padding-left: 20px;
-    }
-
-    .instructions li {
-      margin-bottom: 8px;
-      font-size: 14px;
-    }
-
-    /* Existing pair code elements */
     .input-group {
       margin-bottom: 20px;
     }
@@ -304,8 +245,8 @@
   <div class="container">
     <div class="header">
       <div class="logo"><i class="fas fa-robot"></i></div>
-      <h1 class="title">MASTERTECH LINKER</h1>
-      <p class="subtitle">Link your WhatsApp device</p>
+      <h1 class="title">MASTERTECH PAIR</h1>
+      <p class="subtitle">Generate your WhatsApp pair code</p>
       <div class="social-icons">
         <a href="https://www.youtube.com/@?sub_confirmation=1" target="_blank" class="youtube"><i class="fab fa-youtube"></i></a>
         <a href="https://t.me/" target="_blank" class="telegram"><i class="fab fa-telegram-plane"></i></a>
@@ -314,27 +255,7 @@
       </div>
     </div>
 
-    <!-- New toggle buttons -->
-    <div class="option-buttons">
-      <div class="option-button" id="pairCodeBtn">Pair Code</div>
-      <div class="option-button selected" id="qrCodeBtn">QR Code</div>
-    </div>
-
-    <!-- QR Code Section -->
-    <div class="qr-container" id="qrContainer">
-      <canvas id="qrCodeCanvas"></canvas>
-      <div class="instructions" id="instructions">
-        <ol>
-          <li>Open WhatsApp on your phone</li>
-          <li>Go to Settings > Linked Devices</li>
-          <li>Tap "Link a Device"</li>
-          <li>Scan the QR code above</li>
-        </ol>
-      </div>
-    </div>
-
-    <!-- Existing Pair Code Section -->
-    <div class="input-group" id="numberInput">
+    <div class="input-group">
       <label class="input-label">Enter your WhatsApp number with country code</label>
       <input type="text" id="mobileNumber" class="input-field" placeholder="+254743727510" pattern="[+][0-9]{10,}" title="Please enter country code starting with + followed by number">
     </div>
@@ -361,117 +282,55 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.0.0-alpha.1/axios.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
-  
   <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      const pairCodeBtn = document.getElementById('pairCodeBtn');
-      const qrCodeBtn = document.getElementById('qrCodeBtn');
-      const qrContainer = document.getElementById('qrContainer');
-      const instructions = document.getElementById('instructions');
-      const numberInput = document.getElementById('numberInput');
-      const generateBtn = document.getElementById('submit');
-      const codeDisplay = document.getElementById('codeDisplay');
-      const copyBtn = document.getElementById('copy');
-      const loadingSpinner = document.getElementById('loading');
-      
-      // Initialize with QR code view hidden (showing pair code by default)
-      qrContainer.style.display = 'none';
-      instructions.style.display = 'none';
-      
-      // Toggle between views
-      pairCodeBtn.addEventListener('click', function() {
-        pairCodeBtn.classList.add('selected');
-        qrCodeBtn.classList.remove('selected');
-        qrContainer.style.display = 'none';
-        instructions.style.display = 'none';
-        numberInput.style.display = 'block';
-        generateBtn.style.display = 'block';
-      });
+    document.getElementById("submit").addEventListener("click", async (e) => {
+      e.preventDefault();
+      const mobileNumberInput = document.getElementById("mobileNumber");
+      const codeDisplay = document.getElementById("codeDisplay");
+      const loadingSpinner = document.getElementById("loading");
 
-      qrCodeBtn.addEventListener('click', function() {
-        qrCodeBtn.classList.add('selected');
-        pairCodeBtn.classList.remove('selected');
-        qrContainer.style.display = 'block';
-        instructions.style.display = 'block';
-        numberInput.style.display = 'none';
-        generateBtn.style.display = 'none';
-        codeDisplay.style.display = 'none';
-        copyBtn.style.display = 'none';
-        
-        // Generate QR code
-        generateQRCode();
-      });
+      const mobileNumber = mobileNumberInput.value.trim();
+      if (!mobileNumber) {
+        codeDisplay.innerHTML = '<div class="error-message"><i class="fas fa-exclamation-circle"></i> Please enter your WhatsApp number</div>';
+        return;
+      }
 
-      // QR Code Generation
-      function generateQRCode() {
-        loadingSpinner.style.display = 'block';
-        
-        // This is a placeholder - replace with your actual QR code generation logic
-        // For a real implementation, you would call your backend endpoint
+      loadingSpinner.style.display = "block";
+      codeDisplay.innerHTML = '';
+
+      try {
+        const response = await axios(`/code?number=${mobileNumber.replace(/[^0-9]/g, "")}`);
+        const code = response.data.code || "Service Unavailable";
+        if (code === "Service Unavailable") {
+          codeDisplay.innerHTML = '<div class="error-message"><i class="fas fa-exclamation-circle"></i> Service Unavailable</div>';
+        } else {
+          codeDisplay.innerHTML = `<div class="success-message"><i class="fas fa-check-circle"></i> CODE: ${code}</div>`;
+        }
+      } catch (error) {
+        console.error("Error generating code:", error);
+        codeDisplay.innerHTML = '<div class="error-message"><i class="fas fa-exclamation-circle"></i> Error generating code. Please try again.</div>';
+      } finally {
+        loadingSpinner.style.display = "none";
+      }
+    });
+
+    function copyCode() {
+      const codeDisplay = document.getElementById("codeDisplay").innerText;
+      const code = codeDisplay.replace('CODE: ', '');
+      navigator.clipboard.writeText(code).then(() => {
+        const copyBtn = document.getElementById("copy");
+        const originalText = copyBtn.innerHTML;
+        copyBtn.innerHTML = '<i class="fas fa-check"></i> Copied!';
         setTimeout(() => {
-          const sampleQR = 'https://example.com/whatsapp-link';
-          QRCode.toCanvas(document.getElementById('qrCodeCanvas'), sampleQR, 
-            { width: 200, margin: 1 }, 
-            function(error) {
-              loadingSpinner.style.display = 'none';
-              if (error) {
-                console.error('QR generation error:', error);
-                document.getElementById('qrCodeCanvas').getContext('2d').fillText('QR Generation Failed', 10, 50);
-              }
-            }
-          );
-        }, 1000);
-      }
-
-      // Your existing pair code generation (keep this exactly as it was working)
-      document.getElementById("submit").addEventListener("click", async (e) => {
-        e.preventDefault();
-        const mobileNumberInput = document.getElementById("mobileNumber");
-        const codeDisplay = document.getElementById("codeDisplay");
-        const loadingSpinner = document.getElementById("loading");
-
-        const mobileNumber = mobileNumberInput.value.trim();
-        if (!mobileNumber) {
-          codeDisplay.innerHTML = '<div class="error-message"><i class="fas fa-exclamation-circle"></i> Please enter your WhatsApp number</div>';
-          return;
-        }
-
-        loadingSpinner.style.display = "block";
-        codeDisplay.innerHTML = '';
-
-        try {
-          const response = await axios(`/code?number=${mobileNumber.replace(/[^0-9]/g, "")}`);
-          const code = response.data.code || "Service Unavailable";
-          if (code === "Service Unavailable") {
-            codeDisplay.innerHTML = '<div class="error-message"><i class="fas fa-exclamation-circle"></i> Service Unavailable</div>';
-          } else {
-            codeDisplay.innerHTML = `<div class="success-message"><i class="fas fa-check-circle"></i> CODE: ${code}</div>`;
-            copyBtn.style.display = 'flex';
-          }
-        } catch (error) {
-          console.error("Error generating code:", error);
-          codeDisplay.innerHTML = '<div class="error-message"><i class="fas fa-exclamation-circle"></i> Error generating code. Please try again.</div>';
-        } finally {
-          loadingSpinner.style.display = "none";
-        }
+          copyBtn.innerHTML = originalText;
+        }, 2000);
+      }).catch(err => {
+        console.error("Failed to copy text: ", err);
       });
-
-      // Your existing copy function
-      function copyCode() {
-        const codeDisplay = document.getElementById("codeDisplay").innerText;
-        const code = codeDisplay.replace('CODE: ', '');
-        navigator.clipboard.writeText(code).then(() => {
-          const copyBtn = document.getElementById("copy");
-          const originalText = copyBtn.innerHTML;
-          copyBtn.innerHTML = '<i class="fas fa-check"></i> Copied!';
-          setTimeout(() => {
-            copyBtn.innerHTML = originalText;
-          }, 2000);
-        }).catch(err => {
-          console.error("Failed to copy text: ", err);
-        });
-      }
+    }
+  </script>
+</body>
+</html>
     });
   </script>
 </body>
